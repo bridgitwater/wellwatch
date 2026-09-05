@@ -9,18 +9,21 @@ import { countryName, fmtDate, fmtInt, fmtRelative } from "@/lib/format";
 export default async function MyWellsPage() {
   const [profile, wells] = await Promise.all([getProfile(), getMyWells()]);
 
-  if (wells.length === 1) redirect(`/wells/${wells[0].code}`);
+  const isAdmin = profile?.role === "admin";
+  if (wells.length === 1 && !isAdmin) redirect(`/wells/${wells[0].code}`);
 
   const firstName = profile?.display_name?.split(" ")[0];
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-8">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold">{firstName ? `${firstName}, your wells` : "Your wells"}</h1>
+        <h1 className="text-3xl font-bold">{isAdmin ? "All wells" : firstName ? `${firstName}, your wells` : "Your wells"}</h1>
         <p className="text-ink-2 mt-1">
-          {wells.length === 0
-            ? "No wells are linked to this email yet."
-            : `${wells.length} communities you've helped bring clean water to.`}
+          {isAdmin
+            ? `${wells.length} wells, as funders see them.`
+            : wells.length === 0
+              ? "No wells are linked to this email yet."
+              : `${wells.length} communities you've helped bring clean water to.`}
         </p>
       </div>
 

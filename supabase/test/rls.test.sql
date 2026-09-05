@@ -29,6 +29,7 @@ select pg_temp.assert((select count(*) from testimonials) = 2, 'funder one sees 
 select pg_temp.assert((select count(*) from organizations where type = 'partner') >= 1, 'funder can read the partner org behind her well');
 select pg_temp.assert((select count(*) from organizations o where not exists (select 1 from wells w where w.partner_org_id = o.id)) = 0, 'but no unrelated organizations');
 select pg_temp.assert((select count(*) from my_wells) = 2, 'my_wells view returns 2');
+select pg_temp.assert((select count(*) from my_wells where amount is null) = 0, 'each my_wells row carries her own funding');
 select pg_temp.assert((select cover_file_id from my_wells where code = 'UG-2026-014') = 'seed-kyabirwa-hand-2', 'cover is latest photo');
 -- Private columns: funders have no SELECT privilege on them at all -----------------
 do $$ begin
@@ -84,6 +85,7 @@ exception when insufficient_privilege then null; end $$;
 -- Admin sees everything -------------------------------------------------------------
 select pg_temp.as_user('10000000-0000-0000-0000-000000000001');
 select pg_temp.assert((select count(*) from wells) = 6, 'admin sees all 6 wells');
+select pg_temp.assert((select count(*) from my_wells) = 6, 'my_wells lists all 6 for the admin');
 select pg_temp.assert((select count(*) from well_funders) = 5, 'admin sees all funding');
 select pg_temp.assert((select count(*) from profiles) = 5, 'admin sees all profiles');
 update wells set people_served = 650 where code = 'UG-2026-014';
