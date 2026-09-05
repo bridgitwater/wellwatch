@@ -9,6 +9,7 @@ import { createWellFolder } from "../drive/client";
 import { STAGE_ORDER, type WellStage } from "../stages";
 import { requireAdmin } from "./guard";
 import { ensureFunderProfile } from "./funders";
+import { countryTimeZone, exifLocalToIso, tzOffsetMinutes } from "../timezones";
 
 export type ActionResult = { ok: true; message?: string } | { ok: false; error: string };
 
@@ -191,8 +192,24 @@ export async function saveUpdate(fd: FormData): Promise<void> {
   const body = ((fd.get("body") as string) || "").trim() || null;
   const stage = (fd.get("stage") as WellStage) || null;
   const status = fd.get("status") === "hidden" ? "hidden" : "published";
+  const happenedOn = String(fd.get("happened_on") ?? "").trim(); // YYYY-MM-DD in the well's local zone, or ""
   const supabase = await createClient();
-  await supabase.from("updates").update({ body, stage, status }).eq("id", id);
+
+  const patch: { body: string | null; stage: WellStage | null; status: string; happened_at?: string } = { body, stage, status };
+  if (/^\d{4}-\d{2}-\d{2}$/.test(happenedOn)) {
+    // Change the calendar day but keep the time of day, both in the well's local zone.
+    const { data: cur } = await supabase.from("updates").select("happened_at, wells(country)").eq("id", id).maybeSingle();
+    const row = cur as unknown as { happened_at: string; wells: { country: string } | null } | null;
+    if (row) {
+      const zone = countryTimeZone(row.wells?.country);
+      const at = new Date(row.happened_at);
+      const local = new Date(at.getTime() + tzOffsetMinutes(zone, at) * 60000);
+      const hms = local.toISOString().slice(11, 19);
+      const iso = exifLocalToIso(`${happenedOn.replaceAll("-", ":")} ${hms}`, zone);
+      if (iso && iso !== row.happened_at) patch.happened_at = iso;
+    }
+  }
+  await supabase.from("updates").update(patch).eq("id", id);
   revalidatePath(`/admin/wells/${code}`);
   revalidatePath(`/wells/${code}`);
   revalidatePath("/admin");

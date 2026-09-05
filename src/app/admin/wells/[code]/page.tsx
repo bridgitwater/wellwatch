@@ -8,6 +8,7 @@ import { WellForm } from "@/components/admin/well-form";
 import { DriveImage } from "@/components/drive-image";
 import { StagePill } from "@/components/stage-pill";
 import { fmtDate, fmtDateIn, fmtMoney } from "@/lib/format";
+import { countryTimeZone } from "@/lib/timezones";
 import { STAGE_LABEL, STAGE_ORDER } from "@/lib/stages";
 import { createClient } from "@/lib/supabase/server";
 import { COST_LABEL, type Cost, type StageRow, type Testimonial, type WaterTest, type Well, type WellPrivate, WELL_COLUMNS } from "@/lib/types";
@@ -92,11 +93,12 @@ export default async function AdminWell({ params }: PageProps<"/admin/wells/[cod
             <ul className="flex flex-col gap-4">
               {(updates.data ?? []).map((u) => (
                 <li key={u.id} className={`rounded-lg border border-line p-4 ${u.status === "hidden" ? "opacity-60" : ""}`}>
-                  <form action={saveUpdate} className="grid gap-2 sm:grid-cols-[1fr_150px_120px_auto] sm:items-end">
+                  <form action={saveUpdate} className="grid gap-2 sm:grid-cols-[1fr_140px_150px_120px_auto] sm:items-end">
                     <input type="hidden" name="id" value={u.id} /><input type="hidden" name="code" value={w.code} />
                     <Field label={`${fmtDateIn(w.country, u.happened_at, { hour: "2-digit", minute: "2-digit" })} (local) · ${u.source}`}>
                       <Textarea name="body" defaultValue={u.body ?? ""} className="min-h-14" placeholder="No note yet — add one for funders" />
                     </Field>
+                    <Field label="Date (local)"><Input name="happened_on" type="date" defaultValue={localDateOf(w.country, u.happened_at)} /></Field>
                     <Field label="Stage"><Select name="stage" defaultValue={u.stage ?? ""}><option value="">—</option>{STAGE_ORDER.map((s) => <option key={s} value={s}>{STAGE_LABEL[s]}</option>)}</Select></Field>
                     <Field label="Visibility"><Select name="status" defaultValue={u.status}><option value="published">Published</option><option value="hidden">Hidden</option></Select></Field>
                     <Button variant="ghost" type="submit">Save</Button>
@@ -222,4 +224,9 @@ export default async function AdminWell({ params }: PageProps<"/admin/wells/[cod
       </div>
     </div>
   );
+}
+
+/** YYYY-MM-DD of an instant in the well country's zone (for <input type="date">). */
+function localDateOf(country: string, iso: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: countryTimeZone(country), year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
 }
