@@ -17,7 +17,11 @@ export function StatStrip({ well }: { well: Well }) {
   if (stats.length === 0) return null;
 
   return (
-    <dl className={`grid gap-px rounded-xl overflow-hidden border border-line bg-line grid-cols-2 ${stats.length >= 4 ? "md:grid-cols-4" : stats.length === 3 ? "md:grid-cols-3" : ""}`}>
+    <dl
+      className={`grid gap-px rounded-xl overflow-hidden border border-line bg-line ${
+        stats.length === 1 ? "grid-cols-1 sm:max-w-xs" : stats.length === 2 ? "grid-cols-2" : stats.length === 3 ? "grid-cols-2 md:grid-cols-3" : "grid-cols-2 md:grid-cols-4"
+      }`}
+    >
       {stats.map((s) => (
         <div key={s.k} className="bg-surface px-5 py-4">
           <dt className="text-xs uppercase tracking-wide text-ink-3 font-semibold">{s.k}</dt>
