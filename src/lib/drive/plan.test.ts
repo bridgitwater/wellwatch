@@ -126,3 +126,23 @@ describe("planSync", () => {
     expect(plan.newUpdates[0].stage).toBe("drilling"); // handover not yet reached in fixture
   });
 });
+
+describe("renamed detection", () => {
+  it("does not flag a file as changed when only the timestamp format differs", () => {
+    const files = [folder("f1", "UG-2026-014 · Kyabirwa"), { ...photo("p1", "f1", "2026-07-06T08:10:00Z"), modifiedTime: "2026-07-06T08:10:00.000Z" }];
+    const wells: DbWell[] = [{ id: "w1", code: "UG-2026-014", drive_folder_id: "f1", stages: [] }];
+    const media: DbMedia[] = [{ id: "m1", update_id: "u1", well_id: "w1", drive_file_id: "p1", name: "p1.jpg", drive_modified_at: "2026-07-06T08:10:00+00:00" }];
+    const plan = planSync(ROOT, files, wells, media, [{ id: "u1", well_id: "w1", source: "drive", happened_at: "2026-07-06T08:10:00+00:00" }]);
+    expect(plan.renamed).toHaveLength(0);
+    expect(plan.newUpdates).toHaveLength(0);
+  });
+  it("still flags a real rename or a later modification", () => {
+    const wells: DbWell[] = [{ id: "w1", code: "UG-2026-014", drive_folder_id: "f1", stages: [] }];
+    const media: DbMedia[] = [{ id: "m1", update_id: "u1", well_id: "w1", drive_file_id: "p1", name: "p1.jpg", drive_modified_at: "2026-07-06T08:10:00+00:00" }];
+    const upd = [{ id: "u1", well_id: "w1", source: "drive" as const, happened_at: "2026-07-06T08:10:00+00:00" }];
+    const renamed = planSync(ROOT, [folder("f1", "UG-2026-014 · Kyabirwa"), photo("p1", "f1", "2026-07-06T08:10:00Z", "pump.jpg")], wells, media, upd);
+    expect(renamed.renamed).toHaveLength(1);
+    const touched = planSync(ROOT, [folder("f1", "UG-2026-014 · Kyabirwa"), { ...photo("p1", "f1", "2026-07-06T08:10:00Z"), modifiedTime: "2026-07-07T09:00:00Z" }], wells, media, upd);
+    expect(touched.renamed).toHaveLength(1);
+  });
+});

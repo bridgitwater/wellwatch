@@ -140,7 +140,8 @@ export function planSync(
 
     const existing = mediaByFileId.get(f.id);
     if (existing) {
-      if (existing.name !== f.name || existing.drive_modified_at !== f.modifiedTime) {
+      // Compare as instants: Postgres returns "…+00:00", Drive sends "…Z" — as strings they never match.
+      if (existing.name !== f.name || !sameInstant(existing.drive_modified_at, f.modifiedTime)) {
         plan.renamed.push({ id: existing.id, name: f.name, drive_modified_at: f.modifiedTime });
       }
       continue;
@@ -199,4 +200,11 @@ export function planSync(
   }
 
   return plan;
+}
+
+function sameInstant(a: string | null, b: string | null): boolean {
+  if (!a || !b) return a === b;
+  const ta = new Date(a).getTime();
+  const tb = new Date(b).getTime();
+  return Number.isNaN(ta) || Number.isNaN(tb) ? a === b : ta === tb;
 }
