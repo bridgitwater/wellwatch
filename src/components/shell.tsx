@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Profile } from "@/lib/types";
+import { setNotifyEmail } from "@/app/wells/actions";
 
 export function Shell({ profile, children }: { profile: Profile | null; children: React.ReactNode }) {
   return (
@@ -13,6 +14,14 @@ export function Shell({ profile, children }: { profile: Profile | null; children
           <nav className="flex items-center gap-4 text-sm">
             {profile?.role === "admin" && (
               <Link href="/admin" className="text-ink-2 hover:text-ink">Admin</Link>
+            )}
+            {profile && (
+              <form action={setNotifyEmail} className="hidden sm:block">
+                <input type="hidden" name="on" value={profile.notify_email ? "0" : "1"} />
+                <button type="submit" className="text-ink-2 hover:text-ink" title="Toggle email updates">
+                  Email updates: <span className="font-semibold">{profile.notify_email ? "on" : "off"}</span>
+                </button>
+              </form>
             )}
             {profile && (
               <form action="/auth/signout" method="post">
