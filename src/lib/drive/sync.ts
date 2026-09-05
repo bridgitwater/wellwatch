@@ -1,4 +1,4 @@
-import { createAdminClient, errorMessage, withRetry } from "../supabase/admin";
+import { createAdminClient, errorMessage, selectAll } from "../supabase/admin";
 import { listAllInDrive, sharedDriveId } from "./client";
 import { planSync, type DbMedia, type DbUpdate, type DbWell, type SyncPlan } from "./plan";
 
@@ -17,24 +17,21 @@ export type SyncResult = {
 export async function runDriveSync(): Promise<SyncResult> {
   const db = createAdminClient();
   try {
-    const [files, wellsRes, mediaRes, updatesRes] = await Promise.all([
+    // Paged reads (PostgREST caps a single select at 1,000 rows; past that the
+    // planner would re-insert existing media and trip the unique constraint).
+    // Each page retries 3x with backoff.
+    const [files, wells, media, updates] = await Promise.all([
       listAllInDrive(),
-      withRetry("read wells", () =>
+      selectAll<DbWell>("read wells", () =>
         db.from("wells").select("id, code, drive_folder_id, stages(stage, reached_at)"),
       ),
-      withRetry("read media", () =>
+      selectAll<DbMedia>("read media", () =>
         db.from("media").select("id, update_id, well_id, drive_file_id, name, drive_modified_at"),
       ),
-      withRetry("read updates", () => db.from("updates").select("id, well_id, source, happened_at")),
+      selectAll<DbUpdate>("read updates", () => db.from("updates").select("id, well_id, source, happened_at")),
     ]);
 
-    const plan = planSync(
-      sharedDriveId(),
-      files,
-      wellsRes.data as unknown as DbWell[],
-      mediaRes.data as DbMedia[],
-      updatesRes.data as DbUpdate[],
-    );
+    const plan = planSync(sharedDriveId(), files, wells, media, updates);
 
     const counts = await applyPlan(db, plan);
 

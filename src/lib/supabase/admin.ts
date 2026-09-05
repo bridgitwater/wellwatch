@@ -62,3 +62,29 @@ export async function withRetry<T extends { error: unknown }>(
   }
   throw new Error(`${label} failed after ${attempts} attempts: ${errorMessage(lastErr)}`);
 }
+
+/**
+ * Reads a whole table (or filtered set) in pages, so results aren't silently
+ * truncated by PostgREST's default 1,000-row cap. `query` builds a fresh query
+ * each call; ordering by `orderBy` keeps pages stable.
+ */
+export async function selectAll<Row>(
+  label: string,
+  query: () => {
+    order: (col: string, opts?: { ascending?: boolean }) => {
+      range: (from: number, to: number) => PromiseLike<{ data: Row[] | null; error: unknown }>;
+    };
+  },
+  orderBy = "id",
+  pageSize = 1000,
+): Promise<Row[]> {
+  const out: Row[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const res = await withRetry(`${label} (rows ${from}–${from + pageSize - 1})`, () =>
+      query().order(orderBy, { ascending: true }).range(from, from + pageSize - 1),
+    );
+    const rows = res.data ?? [];
+    out.push(...rows);
+    if (rows.length < pageSize) return out;
+  }
+}
