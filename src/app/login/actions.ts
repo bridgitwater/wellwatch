@@ -33,7 +33,9 @@ export async function sendMagicLink(_prev: LoginState, formData: FormData): Prom
       // Only people the admin has invited can sign in; strangers get the same
       // "check your email" message but no account is created.
       shouldCreateUser: false,
-      emailRedirectTo: `${appUrl}/auth/callback?next=${encodeURIComponent(next)}`,
+      // Straight to the client-side completer: the session arrives in the URL
+      // fragment, so a server hop via /auth/callback would only add a redirect.
+      emailRedirectTo: `${appUrl}/auth/complete?next=${encodeURIComponent(next)}`,
     },
   });
 

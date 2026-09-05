@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { DriveImage } from "./drive-image";
-import { STAGE_LABEL } from "@/lib/stages";
+import { stageLabel } from "@/lib/stages";
 import { fmtDate } from "@/lib/format";
 import { driveEmbed, driveView, isPlaceholderId } from "@/lib/media";
-import type { Media, Update } from "@/lib/types";
+import type { Media, Update, WellType } from "@/lib/types";
 
-export function UpdateFeed({ updates, wellName }: { updates: Update[]; wellName: string }) {
+export function UpdateFeed({ updates, wellName, type = "drilled", title = "From the field" }: { updates: Update[]; wellName: string; type?: WellType; title?: string }) {
   const [open, setOpen] = useState<Media | null>(null);
 
   if (updates.length === 0) {
@@ -21,7 +21,7 @@ export function UpdateFeed({ updates, wellName }: { updates: Update[]; wellName:
 
   return (
     <section aria-labelledby="updates-h">
-      <h2 id="updates-h" className="text-lg font-bold mb-3">From the field</h2>
+      <h2 id="updates-h" className="text-lg font-bold mb-3">{title}</h2>
       <ol className="flex flex-col gap-6">
         {updates.map((u) => (
           <li key={u.id} className="rounded-xl border border-line bg-surface overflow-hidden">
@@ -29,7 +29,7 @@ export function UpdateFeed({ updates, wellName }: { updates: Update[]; wellName:
               <time dateTime={u.happened_at} className="font-semibold">
                 {fmtDate(u.happened_at)}
               </time>
-              {u.stage && <span className="text-ink-2">{STAGE_LABEL[u.stage]}</span>}
+              {u.stage && <span className="text-ink-2">{stageLabel(u.stage, type)}</span>}
             </div>
             {u.body && <p className="px-5 pb-4 text-[15px] leading-relaxed max-w-prose">{u.body}</p>}
             <MediaGrid media={u.media} wellName={wellName} onOpen={setOpen} />

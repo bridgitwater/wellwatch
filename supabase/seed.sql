@@ -125,3 +125,14 @@ insert into public.media (update_id, well_id, drive_file_id, kind, mime, name, w
   ('30000000-0000-0000-0000-000000000004', '20000000-0000-0000-0000-000000000001', 'seed-kyabirwa-hand-2',   'photo', 'image/jpeg', 'IMG_4215.jpg', 1600, 1200, '2026-07-19 13:45+03'),
   ('30000000-0000-0000-0000-000000000005', '20000000-0000-0000-0000-000000000004', 'seed-chipoka-drill-1',   'photo', 'image/jpeg', 'IMG_0087.jpg', 1600, 1200, '2026-08-04 15:10+02'),
   ('30000000-0000-0000-0000-000000000006', '20000000-0000-0000-0000-000000000002', 'seed-buwenge-drill-1',   'photo', 'image/jpeg', 'IMG_5001.jpg', 1600, 1200, '2026-09-01 11:30+03');
+
+-- Completion-report extras
+insert into public.testimonials (well_id, name, age, role, quote) values
+  ('20000000-0000-0000-0000-000000000001', 'Susan', 13, 'P7 candidate, Kyabirwa Primary', 'I used to leave home at five in the morning to reach the swamp before school. Now I fetch water in ten minutes.'),
+  ('20000000-0000-0000-0000-000000000005', 'Grace', 40, 'Mother of four', 'We share the stream with elephants. We are waiting for this well.'),
+  ('20000000-0000-0000-0000-000000000003', 'Hidden', 50, 'Should not be visible to funder one', 'x');
+update public.wells set well_type = 'hand_drilled', households = 176, people_served = 1050, before_distance_km = 4, after_distance_m = 300, hours_saved_day = 2,
+  wuc_members = 8, wuc_women = 4, wuc_youth = 2, wuc_pwd = 1, wuc_treasurer_woman = true, plaque_installed = true, completed_at = '2026-07-19'
+  where code = 'UG-2026-014';
+update public.organizations set intro = 'A registered community-based organisation working on a self-help model.', contact_name = 'Steven Beingana', contact_title = 'Director'
+  where id = (select partner_org_id from public.wells where code = 'UG-2026-014');

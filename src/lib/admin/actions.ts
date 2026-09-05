@@ -48,7 +48,38 @@ const wellSchema = z.object({
   target_cost: optNum,
   currency: str(3).default("AUD").transform((s) => s.toUpperCase()),
   folder_is_public: z.preprocess((v) => v === "on" || v === "true", z.boolean()),
+  // Completion-report fields
+  well_type: z.enum(["drilled", "hand_drilled", "refurbished", "solar_system", "piped_scheme", "other"]).default("drilled"),
+  program_name: optStr(200),
+  sponsor_line: optStr(200),
+  households: optNum,
+  pump_type: optStr(120),
+  contractor: optStr(160),
+  gps_text: optStr(120),
+  before_story: optStr(4000),
+  before_distance_km: optNum,
+  after_distance_m: optNum,
+  hours_saved_day: optNum,
+  impacts: optStr(4000),
+  wuc_members: optNum,
+  wuc_women: optNum,
+  wuc_youth: optNum,
+  wuc_pwd: optNum,
+  wuc_treasurer_woman: z.preprocess((v) => v === "on" || v === "true", z.boolean()),
+  training_note: optStr(4000),
+  sustainability: optStr(4000),
+  challenges: optStr(4000),
+  lessons: optStr(4000),
+  plaque_installed: z.preprocess((v) => v === "on" || v === "true", z.boolean()),
+  completed_at: optDate,
+  report_file_id: optStr(120).transform((v) => (v ? driveIdFrom(v) : v)),
 });
+
+/** Accepts a Drive file id or any Drive URL and returns the id. */
+function driveIdFrom(v: string): string {
+  const m = v.match(/\/d\/([\w-]{20,})/) ?? v.match(/[?&]id=([\w-]{20,})/);
+  return m ? m[1] : v;
+}
 
 export async function createWell(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   await requireAdmin();
@@ -187,6 +218,51 @@ export async function toggleMediaHidden(fd: FormData): Promise<void> {
   revalidatePath(`/wells/${String(fd.get("code"))}`);
 }
 
+export async function setMediaTag(fd: FormData): Promise<void> {
+  await requireAdmin();
+  const id = String(fd.get("id"));
+  const tag = ((fd.get("tag") as string) || "").trim() || null;
+  const caption = ((fd.get("caption") as string) || "").trim() || null;
+  const supabase = await createClient();
+  await supabase.from("media").update({ tag, caption }).eq("id", id);
+  revalidatePath(`/admin/wells/${String(fd.get("code"))}`);
+  revalidatePath(`/wells/${String(fd.get("code"))}`);
+}
+
+// ---------------------------------------------------------------------------
+// Testimonials
+// ---------------------------------------------------------------------------
+const testimonialSchema = z.object({
+  well_id: str(40),
+  code: str(20),
+  name: str(120).min(1, "Name is required"),
+  age: optNum,
+  role: optStr(160),
+  quote: str(3000).min(1, "Quote is required"),
+  photo_file_id: optStr(200).transform((v) => (v ? driveIdFrom(v) : v)),
+});
+
+export async function addTestimonial(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  await requireAdmin();
+  const parsed = testimonialSchema.safeParse(fields(fd));
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+  const { code, ...row } = parsed.data;
+  const supabase = await createClient();
+  const { error } = await supabase.from("testimonials").insert(row);
+  if (error) return fail(error);
+  revalidatePath(`/admin/wells/${code}`);
+  revalidatePath(`/wells/${code}`);
+  return { ok: true, message: "Added" };
+}
+
+export async function deleteTestimonial(fd: FormData): Promise<void> {
+  await requireAdmin();
+  const supabase = await createClient();
+  await supabase.from("testimonials").delete().eq("id", String(fd.get("id")));
+  revalidatePath(`/admin/wells/${String(fd.get("code"))}`);
+  revalidatePath(`/wells/${String(fd.get("code"))}`);
+}
+
 export async function createNote(fd: FormData): Promise<void> {
   const profile = await requireAdmin();
   const well_id = String(fd.get("well_id"));
@@ -266,4 +342,27 @@ export async function createOrganization(fd: FormData): Promise<void> {
     type: "partner",
   });
   revalidatePath("/admin/partners");
+}
+
+export async function updateOrganization(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  await requireAdmin();
+  const parsed = z
+    .object({
+      id: str(40),
+      name: str(160).min(1, "Name is required"),
+      country: optStr(2).transform((v) => v?.toUpperCase() ?? null),
+      intro: optStr(2000),
+      contact_name: optStr(120),
+      contact_title: optStr(120),
+      website: optStr(200),
+      logo_file_id: optStr(200).transform((v) => (v ? driveIdFrom(v) : v)),
+    })
+    .safeParse(fields(fd));
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+  const { id, ...row } = parsed.data;
+  const supabase = await createClient();
+  const { error } = await supabase.from("organizations").update(row).eq("id", id);
+  if (error) return fail(error);
+  revalidatePath("/admin/partners");
+  return { ok: true, message: "Saved" };
 }

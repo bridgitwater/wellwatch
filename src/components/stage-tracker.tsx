@@ -1,8 +1,8 @@
-import { STAGE_BLURB, STAGE_LABEL, STAGE_ORDER, stageIndex, type WellStage } from "@/lib/stages";
+import { STAGE_ORDER, stageBlurb, stageIndex, stageLabel, type WellStage } from "@/lib/stages";
 import { fmtDate } from "@/lib/format";
-import type { StageRow } from "@/lib/types";
+import type { StageRow, WellType } from "@/lib/types";
 
-export function StageTracker({ status, stages }: { status: WellStage; stages: StageRow[] }) {
+export function StageTracker({ status, stages, type = "drilled" }: { status: WellStage; stages: StageRow[]; type?: WellType }) {
   const current = stageIndex(status);
   const complete = status === "handover";
   const byStage = new Map(stages.map((s) => [s.stage, s]));
@@ -53,9 +53,9 @@ export function StageTracker({ status, stages }: { status: WellStage; stages: St
               </span>
               <div className="min-w-0">
                 <div className={`font-semibold leading-tight ${reached || isCurrent ? "text-ink" : "text-ink-3"}`}>
-                  {STAGE_LABEL[s]}
+                  {stageLabel(s, type)}
                 </div>
-                <div className="text-sm text-ink-2 mt-0.5">{row?.note ?? STAGE_BLURB[s]}</div>
+                <div className="text-sm text-ink-2 mt-0.5">{row?.note ?? stageBlurb(s, type)}</div>
               </div>
               <div className="text-sm text-right tnum whitespace-nowrap">
                 {reached ? (

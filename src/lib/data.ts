@@ -1,6 +1,6 @@
 import { createClient } from "./supabase/server";
 import { fixtureMyWells, fixtureProfile, fixtureWells, fixturesEnabled } from "./fixtures";
-import type { Cost, Funding, MyWellRow, Profile, StageRow, Update, WaterTest, Well } from "./types";
+import type { Cost, Funding, MyWellRow, Partner, Profile, StageRow, Testimonial, Update, WaterTest, Well } from "./types";
 
 export async function getProfile(): Promise<Profile | null> {
   if (fixturesEnabled()) return fixtureProfile;
@@ -30,6 +30,8 @@ export type WellPage = {
   waterTests: WaterTest[];
   funding: Funding | null;
   cofunders: number;
+  partner: Partner | null;
+  testimonials: Testimonial[];
 };
 
 export async function getWellPage(code: string): Promise<WellPage | null> {
@@ -38,17 +40,21 @@ export async function getWellPage(code: string): Promise<WellPage | null> {
   const { data: well } = await supabase.from("wells").select("*").eq("code", code).maybeSingle();
   if (!well) return null;
 
-  const [stages, updates, costs, tests, funding, cofunders] = await Promise.all([
+  const [stages, updates, costs, tests, funding, cofunders, partner, testimonials] = await Promise.all([
     supabase.from("stages").select("stage, reached_at, expected_at, note").eq("well_id", well.id),
     supabase
       .from("updates")
-      .select("id, stage, body, happened_at, source, media(id, drive_file_id, kind, mime, name, width, height, duration_s, taken_at, caption)")
+      .select("id, stage, body, happened_at, source, media(id, drive_file_id, kind, mime, name, width, height, duration_s, taken_at, caption, tag)")
       .eq("well_id", well.id)
       .order("happened_at", { ascending: false }),
     supabase.from("costs").select("category, amount, currency, note").eq("well_id", well.id),
     supabase.from("water_tests").select("*").eq("well_id", well.id).order("tested_at", { ascending: false }),
     supabase.from("well_funders").select("amount, currency, funded_at, is_primary").eq("well_id", well.id).maybeSingle(),
     supabase.rpc("cofunder_count", { w: well.id }),
+    well.partner_org_id
+      ? supabase.from("organizations").select("id, name, country, intro, contact_name, contact_title, website, logo_file_id").eq("id", well.partner_org_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase.from("testimonials").select("id, name, age, role, quote, photo_file_id, sort").eq("well_id", well.id).order("sort").order("created_at"),
   ]);
 
   const sortedUpdates = ((updates.data ?? []) as Update[]).map((u) => ({
@@ -64,5 +70,7 @@ export async function getWellPage(code: string): Promise<WellPage | null> {
     waterTests: (tests.data ?? []) as WaterTest[],
     funding: (funding.data as Funding | null) ?? null,
     cofunders: (cofunders.data as number | null) ?? 0,
+    partner: (partner.data as Partner | null) ?? null,
+    testimonials: (testimonials.data ?? []) as Testimonial[],
   };
 }

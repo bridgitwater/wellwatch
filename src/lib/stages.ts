@@ -50,3 +50,40 @@ export function stageOn(
   }
   return current;
 }
+
+import type { WellType } from "./types";
+
+/** Stage labels and blurbs read differently for a repair than for a new borehole. */
+export function stageLabel(stage: WellStage, type: WellType = "drilled"): string {
+  if (type === "refurbished") {
+    return ({ drilling: "Repair works", pump_apron: "New pump & platform", survey: "Assessment" } as Partial<Record<WellStage, string>>)[stage] ?? STAGE_LABEL[stage];
+  }
+  if (type === "solar_system" || type === "piped_scheme") {
+    return ({ pump_apron: "Pump, tank & taps" } as Partial<Record<WellStage, string>>)[stage] ?? STAGE_LABEL[stage];
+  }
+  if (type === "hand_drilled") {
+    return ({ drilling: "Hand drilling" } as Partial<Record<WellStage, string>>)[stage] ?? STAGE_LABEL[stage];
+  }
+  return STAGE_LABEL[stage];
+}
+
+export function stageBlurb(stage: WellStage, type: WellType = "drilled"): string {
+  if (type === "refurbished") {
+    return ({
+      survey: "The team inspects the broken well and agrees the repair with the community.",
+      drilling: "Old rods, pipes and cylinder come out; the borehole is flushed and checked.",
+      pump_apron: "A new pump head and downhole parts go in; the platform and drainage are rebuilt.",
+    } as Partial<Record<WellStage, string>>)[stage] ?? STAGE_BLURB[stage];
+  }
+  if (type === "hand_drilled") {
+    return ({
+      drilling: "A crew of five to seven drills by hand to about 40 metres, then cases and gravel-packs the hole.",
+    } as Partial<Record<WellStage, string>>)[stage] ?? STAGE_BLURB[stage];
+  }
+  if (type === "solar_system") {
+    return ({
+      pump_apron: "A submersible pump, solar panels, storage tank and tap stands are installed.",
+    } as Partial<Record<WellStage, string>>)[stage] ?? STAGE_BLURB[stage];
+  }
+  return STAGE_BLURB[stage];
+}

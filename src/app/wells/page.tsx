@@ -1,3 +1,4 @@
+import { WELL_TYPE_LABEL } from "@/lib/types";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { DriveImage } from "@/components/drive-image";
@@ -53,7 +54,7 @@ export default async function MyWellsPage() {
                     <div>
                       <h2 className="text-lg font-bold leading-tight group-hover:text-water">{w.name}</h2>
                       <div className="text-sm text-ink-2">
-                        {w.region ? `${w.region}, ` : ""}{countryName(w.country)}
+                        {WELL_TYPE_LABEL[w.well_type]} · {w.region ? `${w.region}, ` : ""}{countryName(w.country)}
                       </div>
                     </div>
                     <StagePill stage={w.status} />

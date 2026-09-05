@@ -17,7 +17,9 @@ export type MyWellRow = {
   country: string;
   region: string | null;
   status: WellStage;
+  well_type: WellType;
   people_served: number | null;
+  households: number | null;
   approx_lat: number | null;
   approx_lng: number | null;
   updated_at: string;
@@ -27,6 +29,17 @@ export type MyWellRow = {
   is_primary: boolean;
   last_update_at: string | null;
   cover_file_id: string | null;
+};
+
+export type WellType = "drilled" | "hand_drilled" | "refurbished" | "solar_system" | "piped_scheme" | "other";
+
+export const WELL_TYPE_LABEL: Record<WellType, string> = {
+  drilled: "New drilled borewell",
+  hand_drilled: "New hand-drilled borewell",
+  refurbished: "Refurbished borewell",
+  solar_system: "Solar water system",
+  piped_scheme: "Piped water scheme",
+  other: "Water project",
 };
 
 export type Well = {
@@ -39,17 +52,63 @@ export type Well = {
   approx_lat: number | null;
   approx_lng: number | null;
   status: WellStage;
+  well_type: WellType;
+  program_name: string | null;
+  sponsor_line: string | null;
   people_served: number | null;
+  households: number | null;
   depth_m: string | null;
   yield_lph: number | null;
   source_type: string | null;
+  pump_type: string | null;
+  contractor: string | null;
+  gps_text: string | null;
   dedication: string | null;
   summary: string | null;
+  before_story: string | null;
+  before_distance_km: string | null;
+  after_distance_m: number | null;
+  hours_saved_day: string | null;
+  impacts: string | null;
+  wuc_members: number | null;
+  wuc_women: number | null;
+  wuc_youth: number | null;
+  wuc_pwd: number | null;
+  wuc_treasurer_woman: boolean | null;
+  training_note: string | null;
+  sustainability: string | null;
+  challenges: string | null;
+  lessons: string | null;
+  plaque_installed: boolean;
+  completed_at: string | null;
+  report_file_id: string | null;
+  partner_org_id: string | null;
   drive_folder_id: string | null;
   folder_is_public: boolean;
   target_cost: string | null;
   currency: string;
   updated_at: string;
+};
+
+export type Partner = {
+  id: string;
+  name: string;
+  country: string | null;
+  intro: string | null;
+  contact_name: string | null;
+  contact_title: string | null;
+  website: string | null;
+  logo_file_id: string | null;
+};
+
+export type Testimonial = {
+  id: string;
+  name: string;
+  age: number | null;
+  role: string | null;
+  quote: string;
+  photo_file_id: string | null;
+  sort: number;
 };
 
 export type StageRow = {
@@ -70,6 +129,7 @@ export type Media = {
   duration_s: number | null;
   taken_at: string | null;
   caption: string | null;
+  tag: string | null;
 };
 
 export type Update = {

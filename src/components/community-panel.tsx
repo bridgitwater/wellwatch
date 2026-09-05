@@ -1,19 +1,21 @@
 import { WellMap } from "./well-map";
 import { countryName, fmtDate, fmtInt } from "@/lib/format";
-import type { WaterTest, Well } from "@/lib/types";
+import { WELL_TYPE_LABEL, type WaterTest, type Well } from "@/lib/types";
 
 export function CommunityPanel({ well, tests }: { well: Well; tests: WaterTest[] }) {
   const latest = tests[0];
-  const facts: [string, string][] = [
-    ["People served", fmtInt(well.people_served)],
-    ["Water source", well.source_type ?? "—"],
-    ["Depth", well.depth_m ? `${Number(well.depth_m)} m` : "—"],
-    ["Yield", well.yield_lph ? `${fmtInt(well.yield_lph)} L/hour` : "—"],
-  ];
+  const facts: [string, string][] = [["Project", WELL_TYPE_LABEL[well.well_type]]];
+  if (well.pump_type) facts.push(["Pump", well.pump_type]);
+  else if (well.source_type) facts.push(["Water source", well.source_type]);
+  if (well.depth_m) facts.push(["Depth", `${Number(well.depth_m)} m`]);
+  if (well.yield_lph) facts.push(["Yield", `${fmtInt(well.yield_lph)} L/hour`]);
+  if (well.contractor) facts.push(["Contractor", well.contractor]);
+  if (well.gps_text) facts.push(["GPS (as reported)", well.gps_text]);
+  if (well.completed_at) facts.push(["Completed", fmtDate(well.completed_at)]);
 
   return (
     <section aria-labelledby="community-h" className="rounded-xl border border-line bg-surface p-5">
-      <h2 id="community-h" className="text-lg font-bold">The community</h2>
+      <h2 id="community-h" className="text-lg font-bold">Where it is</h2>
       <div className="text-sm text-ink-2 mt-0.5">
         {[well.village, well.region, countryName(well.country)].filter(Boolean).join(", ")}
       </div>
@@ -21,7 +23,7 @@ export function CommunityPanel({ well, tests }: { well: Well; tests: WaterTest[]
       {well.approx_lat != null && well.approx_lng != null && (
         <div className="mt-4">
           <WellMap lat={well.approx_lat} lng={well.approx_lng} label={well.name} />
-          <p className="text-xs text-ink-3 mt-1.5">Pin shows the village, not the exact borehole, for the community&apos;s privacy.</p>
+          <p className="text-xs text-ink-3 mt-1.5">Pin shows the village, not the exact pump, for the community&apos;s privacy.</p>
         </div>
       )}
 
@@ -29,9 +31,9 @@ export function CommunityPanel({ well, tests }: { well: Well; tests: WaterTest[]
 
       <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
         {facts.map(([k, v]) => (
-          <div key={k}>
+          <div key={k} className={k === "GPS (as reported)" || v.length > 24 ? "col-span-2" : ""}>
             <dt className="text-xs text-ink-3">{k}</dt>
-            <dd className="font-semibold tnum">{v}</dd>
+            <dd className="font-semibold tnum break-words">{v}</dd>
           </div>
         ))}
       </dl>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { addCost, addWaterTest, createNote, deleteCost, removeFunder, saveUpdate, setStage, toggleMediaHidden } from "@/lib/admin/actions";
+import { addCost, addWaterTest, createNote, deleteCost, deleteTestimonial, removeFunder, saveUpdate, setMediaTag, setStage, toggleMediaHidden } from "@/lib/admin/actions";
+import { TestimonialForm } from "@/components/admin/testimonial-form";
 import { FunderForm } from "@/components/admin/funder-form";
 import { Button, Card, Field, Input, Select, Textarea } from "@/components/admin/ui";
 import { WellForm } from "@/components/admin/well-form";
@@ -9,7 +10,7 @@ import { StagePill } from "@/components/stage-pill";
 import { fmtDate, fmtMoney } from "@/lib/format";
 import { STAGE_LABEL, STAGE_ORDER } from "@/lib/stages";
 import { createClient } from "@/lib/supabase/server";
-import { COST_LABEL, type Cost, type StageRow, type WaterTest, type Well } from "@/lib/types";
+import { COST_LABEL, type Cost, type StageRow, type Testimonial, type WaterTest, type Well } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -19,19 +20,21 @@ export default async function AdminWell({ params }: PageProps<"/admin/wells/[cod
   const { data: well } = await supabase.from("wells").select("*").eq("code", code).maybeSingle();
   if (!well) notFound();
 
-  const [orgs, stages, funders, updates, costs, tests] = await Promise.all([
+  const [orgs, stages, funders, updates, costs, tests, testimonials] = await Promise.all([
     supabase.from("organizations").select("id, name").eq("type", "partner").order("name"),
     supabase.from("stages").select("stage, reached_at, expected_at, note").eq("well_id", well.id),
     supabase.from("well_funders").select("id, amount, currency, funded_at, is_primary, profiles(email, display_name)").eq("well_id", well.id).order("funded_at"),
-    supabase.from("updates").select("id, body, stage, status, source, happened_at, media(id, drive_file_id, kind, name, hidden)").eq("well_id", well.id).order("happened_at", { ascending: false }),
+    supabase.from("updates").select("id, body, stage, status, source, happened_at, media(id, drive_file_id, kind, name, hidden, tag, caption)").eq("well_id", well.id).order("happened_at", { ascending: false }),
     supabase.from("costs").select("id, category, amount, currency, note").eq("well_id", well.id),
     supabase.from("water_tests").select("*").eq("well_id", well.id).order("tested_at", { ascending: false }),
+    supabase.from("testimonials").select("id, name, age, role, quote, photo_file_id, sort").eq("well_id", well.id).order("sort").order("created_at"),
   ]);
 
   const stageBy = new Map(((stages.data ?? []) as StageRow[]).map((s) => [s.stage, s]));
   type FunderRow = { id: string; amount: string | null; currency: string; funded_at: string | null; is_primary: boolean; profiles: { email: string; display_name: string | null } | null };
   const funderRows = (funders.data ?? []) as unknown as FunderRow[];
-  const w = well as Well & { exact_lat: number | null; exact_lng: number | null; partner_org_id: string | null };
+  const w = well as Well & { exact_lat: number | null; exact_lng: number | null };
+  const quotes = (testimonials.data ?? []) as Testimonial[];
 
   return (
     <div>
@@ -94,17 +97,30 @@ export default async function AdminWell({ params }: PageProps<"/admin/wells/[cod
                     <Button variant="ghost" type="submit">Save</Button>
                   </form>
                   {u.media.length > 0 && (
-                    <ul className="mt-3 flex flex-wrap gap-2">
+                    <ul className="mt-3 grid gap-2 sm:grid-cols-2">
                       {u.media.map((m) => (
-                        <li key={m.id} className={`relative ${m.hidden ? "opacity-40" : ""}`}>
-                          {m.kind === "photo" ? (
-                            <DriveImage fileId={m.drive_file_id} alt={m.name ?? ""} width={200} className="h-20 w-20 rounded object-cover" />
-                          ) : (
-                            <div className="h-20 w-20 rounded bg-aquifer text-xs flex items-center justify-center text-water-deep">{m.kind}</div>
-                          )}
-                          <form action={toggleMediaHidden} className="absolute bottom-1 right-1">
-                            <input type="hidden" name="id" value={m.id} /><input type="hidden" name="code" value={w.code} /><input type="hidden" name="hide" value={m.hidden ? "0" : "1"} />
-                            <button type="submit" className="rounded bg-black/60 text-white text-[10px] px-1.5 py-0.5">{m.hidden ? "show" : "hide"}</button>
+                        <li key={m.id} className={`flex gap-2 ${m.hidden ? "opacity-40" : ""}`}>
+                          <div className="relative shrink-0">
+                            {m.kind === "photo" ? (
+                              <DriveImage fileId={m.drive_file_id} alt={m.name ?? ""} width={200} className="h-20 w-20 rounded object-cover" />
+                            ) : (
+                              <div className="h-20 w-20 rounded bg-aquifer text-xs flex items-center justify-center text-water-deep">{m.kind}</div>
+                            )}
+                            <form action={toggleMediaHidden} className="absolute bottom-1 right-1">
+                              <input type="hidden" name="id" value={m.id} /><input type="hidden" name="code" value={w.code} /><input type="hidden" name="hide" value={m.hidden ? "0" : "1"} />
+                              <button type="submit" className="rounded bg-black/60 text-white text-[10px] px-1.5 py-0.5">{m.hidden ? "show" : "hide"}</button>
+                            </form>
+                          </div>
+                          <form action={setMediaTag} className="flex-1 grid gap-1 text-xs">
+                            <input type="hidden" name="id" value={m.id} /><input type="hidden" name="code" value={w.code} />
+                            <Select name="tag" defaultValue={m.tag ?? ""} className="!py-1 !text-xs">
+                              <option value="">No tag</option>
+                              <option value="before">Before — old water source</option>
+                              <option value="plaque">Acknowledgement plaque</option>
+                              <option value="inauguration">Inauguration / cover photo</option>
+                            </Select>
+                            <Input name="caption" defaultValue={m.caption ?? ""} placeholder="Caption for funders" className="!py-1 !text-xs" />
+                            <button type="submit" className="justify-self-start text-water font-semibold">Save</button>
                           </form>
                         </li>
                       ))}
@@ -113,6 +129,23 @@ export default async function AdminWell({ params }: PageProps<"/admin/wells/[cod
                 </li>
               ))}
             </ul>
+          </Card>
+
+          <Card title={`Testimonials (${quotes.length})`}>
+            {quotes.length > 0 && (
+              <ul className="mb-5 flex flex-col divide-y divide-line text-sm">
+                {quotes.map((t) => (
+                  <li key={t.id} className="py-3 flex gap-3 items-start">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold">{t.name}{t.age ? `, ${t.age}` : ""}{t.role ? <span className="text-ink-2 font-normal"> · {t.role}</span> : null}</div>
+                      <p className="text-ink-2 mt-1 line-clamp-3">“{t.quote}”</p>
+                    </div>
+                    <form action={deleteTestimonial}><input type="hidden" name="id" value={t.id} /><input type="hidden" name="code" value={w.code} /><Button variant="danger" type="submit">Remove</Button></form>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <TestimonialForm wellId={w.id} code={w.code} />
           </Card>
 
           <Card title="Details">

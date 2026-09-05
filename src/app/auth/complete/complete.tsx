@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { createBrowserClient } from "@supabase/ssr";
 
 /** Finishes an implicit-flow magic link: reads the tokens from the URL fragment and stores the session. */
 export function CompleteSignIn({ next }: { next: string }) {
@@ -16,8 +16,12 @@ export function CompleteSignIn({ next }: { next: string }) {
       window.location.replace(`/login?error=link_expired&next=${encodeURIComponent(next)}${errorDesc ? `&detail=${encodeURIComponent(errorDesc)}` : ""}`);
       return;
     }
-    createClient()
-      .auth.setSession({ access_token, refresh_token })
+    // Implicit flow, and don't let the client also try to parse the hash — we do it once, here.
+    const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+      auth: { flowType: "implicit", detectSessionInUrl: false },
+    });
+    supabase.auth
+      .setSession({ access_token, refresh_token })
       .then(({ error }) => {
         if (error) setFailed(true);
         else window.location.replace(next);
