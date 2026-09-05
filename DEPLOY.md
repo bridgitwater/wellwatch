@@ -60,15 +60,17 @@ Folder naming: `UG-2026-014 · Kyabirwa` — the code at the start is what the s
 
 2. Deploy. Then **Settings → Domains** → add `wells.bridgitwater.org` and create the CNAME it asks for at your DNS provider.
 
-## 5. Scheduler (GitHub Actions)
+## 5. Scheduler (Supabase Cron)
 
-The Drive sync runs every 10 minutes and notifications hourly from `.github/workflows/`. They need two repository secrets:
-GitHub → repo → Settings → Secrets and variables → Actions → New repository secret:
+The Drive sync runs every 10 minutes and notifications hourly from **Supabase Cron** (pg_cron + pg_net), which calls
+`/api/cron/drive-sync` and `/api/cron/notify` with the `CRON_SECRET` bearer token.
 
-- `APP_URL` = `https://wells.bridgitwater.org`
-- `CRON_SECRET` = the same value you gave Vercel
+1. Supabase → **Integrations → Cron** → Enable (this turns on `pg_cron`; `pg_net` is enabled by the script).
+2. **SQL Editor** → paste `supabase/cron.sql`, replace `<CRON_SECRET>` with the value you gave Vercel (and the URL if it differs), run.
+3. A minute later run the check queries at the bottom of that file — `net._http_response` should show a `200` and `drive_sync_state.last_synced_at` should be fresh.
 
-Then Actions → `drive-sync` → **Run workflow** once to confirm it returns 200.
+The two GitHub Actions workflows in `.github/workflows/` are kept as a **manual fallback** (Actions → *drive-sync* → Run workflow).
+They need repository secrets `APP_URL` and `CRON_SECRET`.
 
 ## 6. First real data
 

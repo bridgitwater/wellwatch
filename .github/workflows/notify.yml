@@ -1,8 +1,7 @@
-# Sends due funder emails and the admin digest. Hourly.
+# Manual fallback for funder notifications. The hourly schedule lives in
+# Supabase Cron (supabase/cron.sql); run this from the Actions tab if needed.
 name: notify
 on:
-  schedule:
-    - cron: "5 * * * *"
   workflow_dispatch:
 jobs:
   ping:

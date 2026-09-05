@@ -1,10 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { runDriveSync } from "@/lib/drive/sync";
 
-export const maxDuration = 300; // seconds; Vercel Hobby allows up to 300 for cron-triggered functions
+export const maxDuration = 300; // seconds; Vercel Hobby allows up to 300 with Fluid compute
 export const dynamic = "force-dynamic";
 
-/** Vercel Cron hits this every 10 minutes (see vercel.json) with Authorization: Bearer $CRON_SECRET. */
+/** Hit every 10 minutes by Supabase Cron (supabase/cron.sql) with Authorization: Bearer $CRON_SECRET. */
 export async function GET(request: NextRequest) {
   const auth = request.headers.get("authorization");
   if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {

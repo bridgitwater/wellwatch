@@ -1,9 +1,8 @@
-# Pings the Drive sync endpoint every 10 minutes.
-# (Vercel's own cron is once-a-day on the free plan; GitHub Actions is free at this frequency.)
+# Manual fallback for the Drive sync. The schedule lives in Supabase Cron
+# (supabase/cron.sql, every 10 minutes); run this from the Actions tab if that
+# is ever down.
 name: drive-sync
 on:
-  schedule:
-    - cron: "*/10 * * * *"
   workflow_dispatch:
 jobs:
   ping:
