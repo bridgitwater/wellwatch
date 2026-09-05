@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { LoginForm } from "./login-form";
+import { HashRescue } from "./hash-rescue";
 
 export const metadata: Metadata = { title: "Sign in" };
 
@@ -10,6 +11,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
 
   return (
     <main className="flex-1 flex items-center justify-center px-5 py-12">
+      <HashRescue next={next} />
       <div className="w-full max-w-sm">
         <div className="mb-8">
           <div className="text-xs font-semibold tracking-[0.12em] uppercase text-water">BridgIT Water</div>
