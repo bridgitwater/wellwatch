@@ -2,12 +2,14 @@
 
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
+import { safeNext } from "@/lib/safe-next";
 
 export type LoginState = { status: "idle" } | { status: "sent"; email: string } | { status: "error"; message: string };
 
 const schema = z.object({
   email: z.string().trim().toLowerCase().email("Enter a valid email address"),
-  next: z.string().startsWith("/").catch("/wells"),
+  // Same-origin path only: "//evil.example" passes startsWith("/") but is an open redirect.
+  next: z.unknown().transform((v) => safeNext(v)),
 });
 
 export async function sendMagicLink(_prev: LoginState, formData: FormData): Promise<LoginState> {

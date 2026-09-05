@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import { LoginForm } from "./login-form";
 import { HashRescue } from "./hash-rescue";
+import { safeNext } from "@/lib/safe-next";
 
 export const metadata: Metadata = { title: "Sign in" };
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const sp = await searchParams;
-  const next = typeof sp.next === "string" ? sp.next : "/wells";
+  const next = safeNext(sp.next);
   const error = typeof sp.error === "string" ? sp.error : null;
 
   return (
