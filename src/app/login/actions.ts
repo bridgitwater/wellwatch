@@ -1,8 +1,7 @@
 "use server";
 
 import { z } from "zod";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { createClient } from "@supabase/supabase-js";
 
 export type LoginState = { status: "idle" } | { status: "sent"; email: string } | { status: "error"; message: string };
 
@@ -17,14 +16,12 @@ export async function sendMagicLink(_prev: LoginState, formData: FormData): Prom
 
   const { email, next } = parsed.data;
   // Implicit flow (not PKCE): the emailed link must work from ANY browser or device,
-  // not only the one that requested it. The session lands in the URL fragment and
-  // /auth/complete turns it into cookies.
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { auth: { flowType: "implicit" }, cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } },
-  );
+  // not only the one that requested it. NB: @supabase/ssr's createServerClient
+  // silently forces flowType "pkce", so this must be a plain supabase-js client.
+  // The session lands in the URL fragment and /auth/complete turns it into cookies.
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+    auth: { flowType: "implicit", persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  });
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
   const { error } = await supabase.auth.signInWithOtp({

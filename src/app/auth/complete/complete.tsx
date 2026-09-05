@@ -8,6 +8,12 @@ export function CompleteSignIn({ next }: { next: string }) {
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
+    // A PKCE-style link (?code=) can only be finished server-side; hand it to /auth/callback.
+    const code = new URLSearchParams(window.location.search).get("code");
+    if (code) {
+      window.location.replace(`/auth/callback?code=${encodeURIComponent(code)}&next=${encodeURIComponent(next)}`);
+      return;
+    }
     const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
     const access_token = params.get("access_token");
     const refresh_token = params.get("refresh_token");
