@@ -7,7 +7,7 @@ import { Button, Card, Field, Input, Select, Textarea } from "@/components/admin
 import { WellForm } from "@/components/admin/well-form";
 import { DriveImage } from "@/components/drive-image";
 import { StagePill } from "@/components/stage-pill";
-import { fmtDate, fmtMoney } from "@/lib/format";
+import { fmtDate, fmtDateIn, fmtMoney } from "@/lib/format";
 import { STAGE_LABEL, STAGE_ORDER } from "@/lib/stages";
 import { createClient } from "@/lib/supabase/server";
 import { COST_LABEL, type Cost, type StageRow, type Testimonial, type WaterTest, type Well, type WellPrivate, WELL_COLUMNS } from "@/lib/types";
@@ -94,7 +94,7 @@ export default async function AdminWell({ params }: PageProps<"/admin/wells/[cod
                 <li key={u.id} className={`rounded-lg border border-line p-4 ${u.status === "hidden" ? "opacity-60" : ""}`}>
                   <form action={saveUpdate} className="grid gap-2 sm:grid-cols-[1fr_150px_120px_auto] sm:items-end">
                     <input type="hidden" name="id" value={u.id} /><input type="hidden" name="code" value={w.code} />
-                    <Field label={`${fmtDate(u.happened_at, { hour: "2-digit", minute: "2-digit" })} · ${u.source}`}>
+                    <Field label={`${fmtDateIn(w.country, u.happened_at, { hour: "2-digit", minute: "2-digit" })} (local) · ${u.source}`}>
                       <Textarea name="body" defaultValue={u.body ?? ""} className="min-h-14" placeholder="No note yet — add one for funders" />
                     </Field>
                     <Field label="Stage"><Select name="stage" defaultValue={u.stage ?? ""}><option value="">—</option>{STAGE_ORDER.map((s) => <option key={s} value={s}>{STAGE_LABEL[s]}</option>)}</Select></Field>

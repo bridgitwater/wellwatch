@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react";
 import { DriveImage } from "./drive-image";
 import { stageLabel } from "@/lib/stages";
-import { fmtDate } from "@/lib/format";
+import { fmtDateIn } from "@/lib/format";
 import { driveEmbed, driveView, isPlaceholderId } from "@/lib/media";
 import type { Media, Update, WellType } from "@/lib/types";
 
-export function UpdateFeed({ updates, wellName, type = "drilled", title = "From the field" }: { updates: Update[]; wellName: string; type?: WellType; title?: string }) {
+export function UpdateFeed({ updates, wellName, country, type = "drilled", title = "From the field" }: { updates: Update[]; wellName: string; country?: string | null; type?: WellType; title?: string }) {
   const [open, setOpen] = useState<Media | null>(null);
 
   if (updates.length === 0) {
@@ -27,7 +27,7 @@ export function UpdateFeed({ updates, wellName, type = "drilled", title = "From 
           <li key={u.id} className="rounded-xl border border-line bg-surface overflow-hidden">
             <div className="px-5 pt-4 pb-3 flex items-center justify-between gap-3 text-sm">
               <time dateTime={u.happened_at} className="font-semibold">
-                {fmtDate(u.happened_at)}
+                {fmtDateIn(country, u.happened_at)}
               </time>
               {u.stage && <span className="text-ink-2">{stageLabel(u.stage, type)}</span>}
             </div>
@@ -36,7 +36,7 @@ export function UpdateFeed({ updates, wellName, type = "drilled", title = "From 
           </li>
         ))}
       </ol>
-      {open && <Lightbox media={open} wellName={wellName} onClose={() => setOpen(null)} />}
+      {open && <Lightbox media={open} wellName={wellName} country={country} onClose={() => setOpen(null)} />}
     </section>
   );
 }
@@ -121,7 +121,7 @@ function VideoEmbed({ media }: { media: Media }) {
   );
 }
 
-function Lightbox({ media, wellName, onClose }: { media: Media; wellName: string; onClose: () => void }) {
+function Lightbox({ media, wellName, country, onClose }: { media: Media; wellName: string; country?: string | null; onClose: () => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -154,7 +154,7 @@ function Lightbox({ media, wellName, onClose }: { media: Media; wellName: string
         <figcaption className="text-white/80 text-sm mt-3 flex justify-between gap-4">
           <span>{media.caption ?? ""}</span>
           <span className="flex gap-4 shrink-0">
-            {media.taken_at && <span>{fmtDate(media.taken_at)}</span>}
+            {media.taken_at && <span>{fmtDateIn(country, media.taken_at)}</span>}
             {!isPlaceholderId(media.drive_file_id) && (
               <a href={driveView(media.drive_file_id)} target="_blank" rel="noreferrer" className="underline">Open in Drive</a>
             )}

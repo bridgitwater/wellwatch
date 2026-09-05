@@ -5,6 +5,7 @@
 import { FOLDER_MIME, type DriveFile } from "./client";
 import { kindFromMime, type MediaKind } from "../media";
 import { stageOn, type WellStage } from "../stages";
+import { countryTimeZone, exifLocalToIso } from "../timezones";
 
 /** Well codes look like UG-2026-014: country, year, sequence. Case-insensitive, must lead the folder name. */
 export const WELL_CODE_RE = /^\s*([A-Z]{2})-(\d{4})-(\d{2,4})\b/i;
@@ -155,7 +156,8 @@ export function planSync(
         width: f.width ?? null,
         height: f.height ?? null,
         duration_s: f.durationS ?? null,
-        taken_at: f.takenAt ?? f.createdTime,
+        // EXIF times are local wall-clock where the photo was taken — the well's country.
+        taken_at: exifLocalToIso(f.exifLocal, countryTimeZone(well.code.slice(0, 2))) ?? f.takenAt ?? f.createdTime,
         drive_modified_at: f.modifiedTime,
       },
     });

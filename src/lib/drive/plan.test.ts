@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FOLDER_MIME, parseExifTime, type DriveFile } from "./client";
+import { FOLDER_MIME, type DriveFile } from "./client";
 import { parseWellCode, planSync, type DbMedia, type DbUpdate, type DbWell } from "./plan";
 
 const ROOT = "root";
@@ -36,11 +36,13 @@ describe("parseWellCode", () => {
   });
 });
 
-describe("parseExifTime", () => {
-  it("parses Drive's EXIF format", () => {
-    expect(parseExifTime("2026:07:06 14:55:02")).toBe("2026-07-06T14:55:02.000Z");
-    expect(parseExifTime(undefined)).toBeUndefined();
-    expect(parseExifTime("garbage")).toBeUndefined();
+describe("EXIF local time", () => {
+  it("is interpreted in the well country's zone (UG = UTC+3)", () => {
+    const files = [folder("f1", "UG-2026-014 · Kyabirwa"), { ...photo("p1", "f1", "2026-07-06T00:00:00Z"), takenAt: undefined, exifLocal: "2026:07:06 14:55:02" }];
+    const wells: DbWell[] = [{ id: "w1", code: "UG-2026-014", drive_folder_id: "f1", stages: [] }];
+    const plan = planSync(ROOT, files, wells, [], []);
+    expect(plan.newUpdates[0].media[0].taken_at).toBe("2026-07-06T11:55:02.000Z");
+    expect(plan.newUpdates[0].happened_at).toBe("2026-07-06T11:55:02.000Z");
   });
 });
 

@@ -1,3 +1,4 @@
+import { countryTimeZone } from "./timezones";
 export function fmtMoney(amount: number | string | null | undefined, currency = "AUD") {
   if (amount == null) return "—";
   const n = typeof amount === "string" ? Number(amount) : amount;
@@ -16,6 +17,11 @@ export function fmtDate(d: string | Date | null | undefined, opts?: Intl.DateTim
     year: "numeric",
     ...opts,
   }).format(new Date(d));
+}
+
+/** fmtDate in the well's local time zone (by ISO country code), so the calendar day matches where the photo was taken. */
+export function fmtDateIn(country: string | null | undefined, d: string | Date | null | undefined, opts?: Intl.DateTimeFormatOptions) {
+  return fmtDate(d, { timeZone: countryTimeZone(country), ...opts });
 }
 
 export function fmtInt(n: number | null | undefined) {

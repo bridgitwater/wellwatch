@@ -34,8 +34,11 @@ export type DriveFile = {
   modifiedTime: string;
   width?: number;
   height?: number;
-  /** EXIF capture time, when Drive could read it. */
+  /** EXIF capture time as an ISO instant, when already known (tests / other sources). */
   takenAt?: string;
+  /** Raw EXIF capture time from Drive, "2026:07:06 14:55:02" — local wall-clock, no zone.
+   *  Interpreted in the well's country zone by the sync planner. */
+  exifLocal?: string;
   durationS?: number;
 };
 
@@ -69,7 +72,7 @@ export async function listAllInDrive(): Promise<DriveFile[]> {
         modifiedTime: f.modifiedTime!,
         width: f.imageMediaMetadata?.width ?? f.videoMediaMetadata?.width ?? undefined,
         height: f.imageMediaMetadata?.height ?? f.videoMediaMetadata?.height ?? undefined,
-        takenAt: parseExifTime(f.imageMediaMetadata?.time),
+        exifLocal: f.imageMediaMetadata?.time ?? undefined,
         durationS: f.videoMediaMetadata?.durationMillis
           ? Math.round(Number(f.videoMediaMetadata.durationMillis) / 1000)
           : undefined,
@@ -78,14 +81,6 @@ export async function listAllInDrive(): Promise<DriveFile[]> {
     pageToken = res.data.nextPageToken ?? undefined;
   } while (pageToken);
   return out;
-}
-
-/** Drive reports EXIF time as "2026:07:06 14:55:02" (local, no zone). Treat as UTC-ish; good enough for day-level stage tagging. */
-export function parseExifTime(t?: string | null): string | undefined {
-  if (!t) return undefined;
-  const m = t.match(/^(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
-  if (!m) return undefined;
-  return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6])).toISOString();
 }
 
 /** Create a well's folder at the root of the Shared Drive and make it viewable by link. */

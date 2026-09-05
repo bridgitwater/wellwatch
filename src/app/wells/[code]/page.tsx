@@ -105,7 +105,7 @@ export default async function WellPage({ params }: PageProps<"/wells/[code]">) {
           {complete && <Testimonials items={testimonials} place={place} />}
           {complete && <ImpactSection well={well} />}
 
-          <UpdateFeed updates={updates} wellName={well.name} type={well.well_type} title={complete ? "How it was built" : "From the field"} />
+          <UpdateFeed updates={updates} wellName={well.name} country={well.country} type={well.well_type} title={complete ? "How it was built" : "From the field"} />
 
           {!complete && <Testimonials items={testimonials} place={place} />}
           {!complete && <ImpactSection well={well} />}
