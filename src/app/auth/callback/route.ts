@@ -23,5 +23,10 @@ export async function GET(request: NextRequest) {
   }
 
   if (ok) return NextResponse.redirect(`${origin}${next}`);
+  if (!code && !tokenHash) {
+    // Implicit-flow link: tokens are in the URL fragment, which never reaches the server.
+    // Browsers carry the fragment across this redirect; /auth/complete reads it client-side.
+    return NextResponse.redirect(`${origin}/auth/complete?next=${encodeURIComponent(next)}`);
+  }
   return NextResponse.redirect(`${origin}/login?error=link_expired&next=${encodeURIComponent(next)}`);
 }
