@@ -1,4 +1,5 @@
 "use server";
+import { errorMessage } from "@/lib/supabase/admin";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -21,7 +22,7 @@ function fields(fd: FormData) {
 }
 
 function fail(e: unknown): ActionResult {
-  const msg = e instanceof Error ? e.message : String(e);
+  const msg = errorMessage(e);
   return { ok: false, error: msg };
 }
 

@@ -1,4 +1,5 @@
 "use server";
+import { errorMessage } from "@/lib/supabase/admin";
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "../supabase/server";
@@ -105,7 +106,7 @@ export async function importFundersCsv(_prev: ImportResult | null, fd: FormData)
       if (error) throw error;
       imported++;
     } catch (e) {
-      skipped.push(`${email}: ${e instanceof Error ? e.message : String(e)}`);
+      skipped.push(`${email}: ${errorMessage(e)}`);
     }
   }
   revalidatePath("/admin/wells");

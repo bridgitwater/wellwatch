@@ -1,4 +1,4 @@
-import { createAdminClient } from "../supabase/admin";
+import { createAdminClient, errorMessage, withRetry } from "../supabase/admin";
 import { listAllInDrive, sharedDriveId } from "./client";
 import { planSync, type DbMedia, type DbUpdate, type DbWell, type SyncPlan } from "./plan";
 
@@ -19,13 +19,14 @@ export async function runDriveSync(): Promise<SyncResult> {
   try {
     const [files, wellsRes, mediaRes, updatesRes] = await Promise.all([
       listAllInDrive(),
-      db.from("wells").select("id, code, drive_folder_id, stages(stage, reached_at)"),
-      db.from("media").select("id, update_id, well_id, drive_file_id, name, drive_modified_at"),
-      db.from("updates").select("id, well_id, source, happened_at"),
+      withRetry("read wells", () =>
+        db.from("wells").select("id, code, drive_folder_id, stages(stage, reached_at)"),
+      ),
+      withRetry("read media", () =>
+        db.from("media").select("id, update_id, well_id, drive_file_id, name, drive_modified_at"),
+      ),
+      withRetry("read updates", () => db.from("updates").select("id, well_id, source, happened_at")),
     ]);
-    if (wellsRes.error) throw wellsRes.error;
-    if (mediaRes.error) throw mediaRes.error;
-    if (updatesRes.error) throw updatesRes.error;
 
     const plan = planSync(
       sharedDriveId(),
@@ -44,7 +45,8 @@ export async function runDriveSync(): Promise<SyncResult> {
 
     return { ok: true, ...counts, unmatchedFolders: plan.unmatchedFolders.map((f) => f.name) };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
+    const msg = errorMessage(e);
+    console.error("drive-sync failed:", msg);
     await db.from("drive_sync_state").update({ last_error: msg }).eq("id", 1);
     return { ok: false, linked: 0, newUpdates: 0, newMedia: 0, renamed: 0, deleted: 0, unmatchedFolders: [], error: msg };
   }

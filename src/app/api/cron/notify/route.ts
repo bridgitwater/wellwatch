@@ -1,3 +1,4 @@
+import { errorMessage } from "@/lib/supabase/admin";
 import { NextResponse, type NextRequest } from "next/server";
 import { runNotifications } from "@/lib/email/notify";
 
@@ -15,6 +16,6 @@ export async function GET(request: NextRequest) {
     const result = await runNotifications();
     return NextResponse.json(result);
   } catch (e) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
+    return NextResponse.json({ error: errorMessage(e) }, { status: 500 });
   }
 }

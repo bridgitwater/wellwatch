@@ -1,4 +1,5 @@
 import "server-only";
+import { errorMessage } from "@/lib/supabase/admin";
 import { createAdminClient } from "../supabase/admin";
 import { STAGE_LABEL, type WellStage } from "../stages";
 import { fmtDate } from "../format";
@@ -61,7 +62,7 @@ export async function runNotifications(): Promise<NotifyResult> {
         await db.from("notifications").insert({ profile_id: f.profile_id, well_id: wellId, kind: "new_update", meta: { updates: updates.map((u) => u.id) } });
         result.funderEmails++;
       } catch (e) {
-        result.errors.push(`${f.profiles.email}: ${e instanceof Error ? e.message : String(e)}`);
+        result.errors.push(`${f.profiles.email}: ${errorMessage(e)}`);
       }
     }
     await db.from("updates").update({ notified_at: now.toISOString() }).in("id", updates.map((u) => u.id));
@@ -92,7 +93,7 @@ export async function runNotifications(): Promise<NotifyResult> {
         await db.from("notifications").insert({ profile_id: a.id, kind: "digest", meta: { count: rows.length } });
         result.digestEmails++;
       } catch (e) {
-        result.errors.push(`digest ${a.email}: ${e instanceof Error ? e.message : String(e)}`);
+        result.errors.push(`digest ${a.email}: ${errorMessage(e)}`);
       }
     }
   }
