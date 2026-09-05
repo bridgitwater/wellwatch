@@ -10,17 +10,18 @@ import { StagePill } from "@/components/stage-pill";
 import { fmtDate, fmtMoney } from "@/lib/format";
 import { STAGE_LABEL, STAGE_ORDER } from "@/lib/stages";
 import { createClient } from "@/lib/supabase/server";
-import { COST_LABEL, type Cost, type StageRow, type Testimonial, type WaterTest, type Well } from "@/lib/types";
+import { COST_LABEL, type Cost, type StageRow, type Testimonial, type WaterTest, type Well, type WellPrivate, WELL_COLUMNS } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminWell({ params }: PageProps<"/admin/wells/[code]">) {
   const { code } = await params;
   const supabase = await createClient();
-  const { data: well } = await supabase.from("wells").select("*").eq("code", code).maybeSingle();
+  const { data: wellRow } = await supabase.from("wells").select(WELL_COLUMNS).eq("code", code).maybeSingle();
+  const well = wellRow as unknown as Well | null;
   if (!well) notFound();
 
-  const [orgs, stages, funders, updates, costs, tests, testimonials] = await Promise.all([
+  const [orgs, stages, funders, updates, costs, tests, testimonials, privateFields] = await Promise.all([
     supabase.from("organizations").select("id, name").eq("type", "partner").order("name"),
     supabase.from("stages").select("stage, reached_at, expected_at, note").eq("well_id", well.id),
     supabase.from("well_funders").select("id, amount, currency, funded_at, is_primary, profiles(email, display_name)").eq("well_id", well.id).order("funded_at"),
@@ -28,12 +29,16 @@ export default async function AdminWell({ params }: PageProps<"/admin/wells/[cod
     supabase.from("costs").select("id, category, amount, currency, note").eq("well_id", well.id),
     supabase.from("water_tests").select("*").eq("well_id", well.id).order("tested_at", { ascending: false }),
     supabase.from("testimonials").select("id, name, age, role, quote, photo_file_id, sort").eq("well_id", well.id).order("sort").order("created_at"),
+    supabase.rpc("well_private_fields", { w: well.id }),
   ]);
 
   const stageBy = new Map(((stages.data ?? []) as StageRow[]).map((s) => [s.stage, s]));
   type FunderRow = { id: string; amount: string | null; currency: string; funded_at: string | null; is_primary: boolean; profiles: { email: string; display_name: string | null } | null };
   const funderRows = (funders.data ?? []) as unknown as FunderRow[];
-  const w = well as Well & { exact_lat: number | null; exact_lng: number | null };
+  // Private columns (exact GPS, contractor) are not selectable by the authenticated role;
+  // admins read them through this security-definer RPC.
+  const priv = (privateFields.data?.[0] ?? { exact_lat: null, exact_lng: null, gps_text: null, contractor: null }) as WellPrivate;
+  const w = { ...well, ...priv };
   const quotes = (testimonials.data ?? []) as Testimonial[];
 
   return (

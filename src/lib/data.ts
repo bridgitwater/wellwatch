@@ -1,6 +1,6 @@
 import { createClient } from "./supabase/server";
 import { fixtureMyWells, fixtureProfile, fixtureWells, fixturesEnabled } from "./fixtures";
-import type { Cost, Funding, MyWellRow, Partner, Profile, StageRow, Testimonial, Update, WaterTest, Well } from "./types";
+import { type Cost, type Funding, type MyWellRow, type Partner, type Profile, type StageRow, type Testimonial, type Update, type WaterTest, type Well, WELL_COLUMNS } from "./types";
 
 export async function getProfile(): Promise<Profile | null> {
   if (fixturesEnabled()) return fixtureProfile;
@@ -37,7 +37,8 @@ export type WellPage = {
 export async function getWellPage(code: string): Promise<WellPage | null> {
   if (fixturesEnabled()) return fixtureWells[code] ?? null;
   const supabase = await createClient();
-  const { data: well } = await supabase.from("wells").select("*").eq("code", code).maybeSingle();
+  const { data: wellRow } = await supabase.from("wells").select(WELL_COLUMNS).eq("code", code).maybeSingle();
+  const well = wellRow as unknown as Well | null;
   if (!well) return null;
 
   const [stages, updates, costs, tests, funding, cofunders, partner, testimonials] = await Promise.all([

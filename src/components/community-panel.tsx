@@ -9,8 +9,6 @@ export function CommunityPanel({ well, tests }: { well: Well; tests: WaterTest[]
   else if (well.source_type) facts.push(["Water source", well.source_type]);
   if (well.depth_m) facts.push(["Depth", `${Number(well.depth_m)} m`]);
   if (well.yield_lph) facts.push(["Yield", `${fmtInt(well.yield_lph)} L/hour`]);
-  if (well.contractor) facts.push(["Contractor", well.contractor]);
-  if (well.gps_text) facts.push(["GPS (as reported)", well.gps_text]);
   if (well.completed_at) facts.push(["Completed", fmtDate(well.completed_at)]);
 
   return (
@@ -31,7 +29,7 @@ export function CommunityPanel({ well, tests }: { well: Well; tests: WaterTest[]
 
       <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
         {facts.map(([k, v]) => (
-          <div key={k} className={k === "GPS (as reported)" || v.length > 24 ? "col-span-2" : ""}>
+          <div key={k} className={v.length > 24 ? "col-span-2" : ""}>
             <dt className="text-xs text-ink-3">{k}</dt>
             <dd className="font-semibold tnum break-words">{v}</dd>
           </div>

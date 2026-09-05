@@ -61,8 +61,6 @@ export type Well = {
   yield_lph: number | null;
   source_type: string | null;
   pump_type: string | null;
-  contractor: string | null;
-  gps_text: string | null;
   dedication: string | null;
   summary: string | null;
   before_story: string | null;
@@ -89,6 +87,27 @@ export type Well = {
   currency: string;
   updated_at: string;
 };
+
+/** Staff/partner-only well fields. Funders' role has no SELECT on these columns;
+ *  admin pages read them via the well_private_fields() RPC. */
+export type WellPrivate = {
+  exact_lat: number | null;
+  exact_lng: number | null;
+  gps_text: string | null;
+  contractor: string | null;
+};
+
+/** Every wells column the authenticated role may read. `select("*")` on wells
+ *  fails since migration 20260905000300 revoked the private columns. */
+export const WELL_COLUMNS = [
+  "id", "code", "name", "country", "region", "village", "approx_lat", "approx_lng", "status",
+  "well_type", "program_name", "sponsor_line", "people_served", "households", "depth_m", "yield_lph",
+  "source_type", "pump_type", "dedication", "summary", "before_story", "before_distance_km",
+  "after_distance_m", "hours_saved_day", "impacts", "wuc_members", "wuc_women", "wuc_youth", "wuc_pwd",
+  "wuc_treasurer_woman", "training_note", "sustainability", "challenges", "lessons", "plaque_installed",
+  "completed_at", "report_file_id", "partner_org_id", "drive_folder_id", "folder_is_public", "target_cost",
+  "currency", "created_at", "updated_at",
+].join(", ");
 
 export type Partner = {
   id: string;

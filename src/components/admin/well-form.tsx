@@ -4,7 +4,7 @@ import { useActionState } from "react";
 import { createWell, updateWell, type ActionResult } from "@/lib/admin/actions";
 import { Button, Field, Input, Notice, Select, Textarea } from "./ui";
 import { COUNTRY_NAME } from "@/lib/format";
-import { WELL_TYPE_LABEL, type Well } from "@/lib/types";
+import { WELL_TYPE_LABEL, type Well, type WellPrivate } from "@/lib/types";
 
 type Org = { id: string; name: string };
 
@@ -18,7 +18,7 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
   );
 }
 
-export function WellForm({ well, orgs }: { well?: Well & { exact_lat?: number | null; exact_lng?: number | null }; orgs: Org[] }) {
+export function WellForm({ well, orgs }: { well?: Well & Partial<WellPrivate>; orgs: Org[] }) {
   const [state, action, pending] = useActionState<ActionResult | null, FormData>(well ? updateWell : createWell, null);
   const w = well;
 

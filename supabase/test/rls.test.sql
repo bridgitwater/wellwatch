@@ -30,7 +30,21 @@ select pg_temp.assert((select count(*) from organizations where type = 'partner'
 select pg_temp.assert((select count(*) from organizations o where not exists (select 1 from wells w where w.partner_org_id = o.id)) = 0, 'but no unrelated organizations');
 select pg_temp.assert((select count(*) from my_wells) = 2, 'my_wells view returns 2');
 select pg_temp.assert((select cover_file_id from my_wells where code = 'UG-2026-014') = 'seed-kyabirwa-hand-2', 'cover is latest photo');
-select pg_temp.assert((select exact_lat from wells where code = 'UG-2026-014') is null, 'exact coords are null in seed (column exists; UI must never render it for funders)');
+-- Private columns: funders have no SELECT privilege on them at all -----------------
+do $$ begin
+  perform exact_lat from wells where code = 'UG-2026-014';
+  raise exception 'ASSERT FAILED: funder could select wells.exact_lat';
+exception when insufficient_privilege then null; end $$;
+do $$ begin
+  perform exact_lng, gps_text, contractor from wells where code = 'UG-2026-014';
+  raise exception 'ASSERT FAILED: funder could select wells.exact_lng/gps_text/contractor';
+exception when insufficient_privilege then null; end $$;
+do $$ begin
+  perform * from wells where code = 'UG-2026-014';
+  raise exception 'ASSERT FAILED: funder could select * from wells';
+exception when insufficient_privilege then null; end $$;
+select pg_temp.assert((select count(*) from wells where code = 'UG-2026-014') = 1, 'but public columns of the well are still readable');
+select pg_temp.assert((select count(*) from well_private_fields('20000000-0000-0000-0000-000000000001')) = 0, 'well_private_fields returns nothing to a funder');
 
 -- Funder cannot write ----------------------------------------------------------
 do $$ begin
@@ -74,10 +88,20 @@ select pg_temp.assert((select count(*) from well_funders) = 5, 'admin sees all f
 select pg_temp.assert((select count(*) from profiles) = 5, 'admin sees all profiles');
 update wells set people_served = 650 where code = 'UG-2026-014';
 select pg_temp.assert((select people_served from wells where code = 'UG-2026-014') = 650, 'admin can update wells');
+update wells set exact_lat = 0.7301, exact_lng = 32.9658, gps_text = 'N 0.7301, E 32.9658', contractor = 'Test Drillers' where code = 'UG-2026-014';
+select pg_temp.assert((select gps_text from well_private_fields('20000000-0000-0000-0000-000000000001')) = 'N 0.7301, E 32.9658', 'admin reads private fields via well_private_fields()');
+select pg_temp.assert((select contractor from well_private_fields('20000000-0000-0000-0000-000000000001')) = 'Test Drillers', 'incl. contractor');
+
+-- Field user of the partner org reads private fields; another org's field user does not
+select pg_temp.as_user('10000000-0000-0000-0000-000000000002');
+select pg_temp.assert((select count(*) from well_private_fields('20000000-0000-0000-0000-000000000001')) = 1, 'partner field user reads private fields of own well');
 
 -- Anonymous sees nothing -------------------------------------------------------------
 reset role; select set_config('request.jwt.claim.sub', '', true); set local role anon;
-select pg_temp.assert((select count(*) from wells) = 0, 'anon sees no wells');
+do $$ begin
+  perform count(*) from wells;
+  raise exception 'ASSERT FAILED: anon could select from wells';
+exception when insufficient_privilege then null; end $$;  -- anon has no SELECT on wells at all
 select pg_temp.assert((select count(*) from updates) = 0, 'anon sees no updates');
 
 rollback;
