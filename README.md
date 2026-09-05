@@ -1,36 +1,52 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# WellWatch
 
-## Getting Started
+BridgIT Water's funder portal. Each funder signs in with an emailed link and sees the well(s) they funded: progress through the six stages, photos and video from the field, the community, and what their gift paid for.
 
-First, run the development server:
+Photos and videos live in a Google **Shared Drive** called `Wells`, one folder per well (`UG-2026-014 · Kyabirwa`). The team drops incoming WhatsApp photos into the folder; a sync job every ten minutes turns new files into updates on the funder's page. Drive is the master copy — nothing is copied out.
+
+## Stack
+
+- Next.js 16 (App Router, TypeScript) on Vercel
+- Supabase — Postgres with row-level security, magic-link auth
+- Google Drive API via a service account (read-only in practice; creates well folders)
+- Resend for notification email; MapLibre + OpenFreeMap tiles for the map
+
+## Local development
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
+cp .env.example .env.local   # fill in Supabase + Google values
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Database
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Migrations live in `supabase/migrations/`; apply them with the Supabase CLI (`supabase db push`) or paste into the SQL editor in order. `supabase/seed.sql` loads two partner orgs, six sample wells and three test funders — **never run it against production** (it truncates tables).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+RLS is tested against a plain local Postgres:
 
-## Learn More
+```bash
+pnpm db:test      # applies shim + migrations + seed to a throwaway DB, runs supabase/test/rls.test.sql
+pnpm test         # vitest: Drive sync planner
+pnpm typecheck
+```
 
-To learn more about Next.js, take a look at the following resources:
+## How the pieces fit
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Path | What |
+|---|---|
+| `src/proxy.ts` | Refreshes the session cookie; sends signed-out visitors to `/login` |
+| `src/app/login` | Magic-link form (`shouldCreateUser: false` — only invited emails can sign in) |
+| `src/app/auth/callback` | Exchanges the link for a session |
+| `src/app/wells` | Funder pages: list + well page |
+| `src/lib/drive/plan.ts` | Pure sync planner: folders → wells by code, files → media, hourly grouping into updates, renames, deletions |
+| `src/lib/drive/sync.ts` | Runs the planner against Drive + Supabase (service role) |
+| `src/app/api/cron/drive-sync` | Endpoint the scheduler pings (`Authorization: Bearer $CRON_SECRET`) |
+| `.github/workflows/drive-sync.yml` | The scheduler (every 10 min). Needs repo secrets `APP_URL`, `CRON_SECRET` |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Access rules (enforced in Postgres)
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Funder** sees only wells linked to them in `well_funders`, only *published* updates, and only their own funding row. `cofunder_count()` gives "you and N others" without exposing anyone else.
+- **Field** users see all wells for their partner organization and may insert updates (not used in v1).
+- **Admin** sees and edits everything.
+- The Drive sync and invitations use the service role, which bypasses RLS and never runs in the browser.

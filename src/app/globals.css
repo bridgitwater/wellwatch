@@ -1,26 +1,64 @@
 @import "tailwindcss";
 
+/* WellWatch palette: deep water, aquifer, riverbank clay, cool slate neutrals. Light theme only. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #f4f7f8;
+  --surface: #ffffff;
+  --ink: #16232b;
+  --ink-2: #51666f;
+  --ink-3: #8a9ba3;
+  --line: #dbe4e8;
+  --water: #17607d;
+  --water-deep: #0f4a62;
+  --aquifer: #dcebf1;
+  --clay: #a85c33;
+  --clay-soft: #f3e4da;
+  --ok: #2e7d5b;
+  --ok-soft: #e0f0e8;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-water: var(--water);
+  --color-water-deep: var(--water-deep);
+  --color-aquifer: var(--aquifer);
+  --color-clay: var(--clay);
+  --color-clay-soft: var(--clay-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --font-display: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: light;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, .display {
+  font-family: var(--font-display);
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+
+.tnum { font-variant-numeric: tabular-nums; }
+
+:focus-visible {
+  outline: 2px solid var(--water);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
 }

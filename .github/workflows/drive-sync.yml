@@ -1,0 +1,16 @@
+# Pings the Drive sync endpoint every 10 minutes.
+# (Vercel's own cron is once-a-day on the free plan; GitHub Actions is free at this frequency.)
+name: drive-sync
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger sync
+        run: |
+          curl --fail --silent --show-error --max-time 290 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/cron/drive-sync"
