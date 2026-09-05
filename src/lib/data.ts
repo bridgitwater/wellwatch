@@ -1,7 +1,9 @@
 import { createClient } from "./supabase/server";
+import { fixtureMyWells, fixtureProfile, fixtureWells, fixturesEnabled } from "./fixtures";
 import type { Cost, Funding, MyWellRow, Profile, StageRow, Update, WaterTest, Well } from "./types";
 
 export async function getProfile(): Promise<Profile | null> {
+  if (fixturesEnabled()) return fixtureProfile;
   const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return null;
@@ -10,6 +12,7 @@ export async function getProfile(): Promise<Profile | null> {
 }
 
 export async function getMyWells(): Promise<MyWellRow[]> {
+  if (fixturesEnabled()) return fixtureMyWells;
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("my_wells")
@@ -30,6 +33,7 @@ export type WellPage = {
 };
 
 export async function getWellPage(code: string): Promise<WellPage | null> {
+  if (fixturesEnabled()) return fixtureWells[code] ?? null;
   const supabase = await createClient();
   const { data: well } = await supabase.from("wells").select("*").eq("code", code).maybeSingle();
   if (!well) return null;

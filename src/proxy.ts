@@ -6,6 +6,10 @@ import { NextResponse, type NextRequest } from "next/server";
  * signed-out visitors on protected paths to /login.
  */
 export async function proxy(request: NextRequest) {
+  // Local UI preview without Supabase (see src/lib/fixtures.ts).
+  if (process.env.WELLWATCH_FIXTURES === "1" && process.env.NODE_ENV !== "production") {
+    return NextResponse.next({ request });
+  }
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
