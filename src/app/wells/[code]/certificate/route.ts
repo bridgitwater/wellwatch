@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { renderCertificate } from "@/lib/certificate";
+import { certificateName, renderCertificate } from "@/lib/certificate";
 import { getProfile, getWellPage } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +14,8 @@ export async function GET(_req: Request, ctx: RouteContext<"/wells/[code]/certif
   const pdf = await renderCertificate({
     well: page.well,
     stages: page.stages,
-    funderName: profile.display_name ?? profile.email,
+    // display_name defaults to the email's local part at sign-up ("margaret.chen") — never print that on a certificate.
+    funderName: certificateName(profile.display_name, profile.email, page.well.sponsor_line),
     cofunders: page.cofunders,
   });
 
@@ -26,3 +27,4 @@ export async function GET(_req: Request, ctx: RouteContext<"/wells/[code]/certif
     },
   });
 }
+

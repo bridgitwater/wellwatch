@@ -16,10 +16,12 @@ export function Shell({ profile, children }: { profile: Profile | null; children
               <Link href="/admin" className="text-ink-2 hover:text-ink">Admin</Link>
             )}
             {profile && (
-              <form action={setNotifyEmail} className="hidden sm:block">
+              <form action={setNotifyEmail}>
                 <input type="hidden" name="on" value={profile.notify_email ? "0" : "1"} />
-                <button type="submit" className="text-ink-2 hover:text-ink" title="Toggle email updates">
-                  Email updates: <span className="font-semibold">{profile.notify_email ? "on" : "off"}</span>
+                <button type="submit" className="text-ink-2 hover:text-ink" title={profile.notify_email ? "Turn email updates off" : "Turn email updates on"}>
+                  <span className="hidden sm:inline">Email updates: </span>
+                  <span className="sm:hidden" aria-hidden="true">✉ </span>
+                  <span className="font-semibold">{profile.notify_email ? "on" : "off"}</span>
                 </button>
               </form>
             )}

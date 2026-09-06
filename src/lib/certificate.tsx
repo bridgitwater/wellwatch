@@ -13,9 +13,9 @@ const s = StyleSheet.create({
   dedication: { fontSize: 13, fontFamily: "Helvetica-Oblique", color: "#0F4A62", marginBottom: 24, padding: 14, backgroundColor: "#DCEBF1", borderRadius: 4 },
   grid: { flexDirection: "row", flexWrap: "wrap", marginBottom: 28 },
   cell: { width: "33%", marginBottom: 14 },
-  k: { fontSize: 9, color: "#8A9BA3", textTransform: "uppercase", letterSpacing: 1, marginBottom: 3 },
+  k: { fontSize: 9, color: "#66787F", textTransform: "uppercase", letterSpacing: 1, marginBottom: 3 },
   v: { fontSize: 13, fontFamily: "Helvetica-Bold" },
-  footer: { position: "absolute", left: 56, right: 56, bottom: 40, flexDirection: "row", justifyContent: "space-between", fontSize: 9, color: "#8A9BA3" },
+  footer: { position: "absolute", left: 56, right: 56, bottom: 40, flexDirection: "row", justifyContent: "space-between", fontSize: 9, color: "#66787F" },
 });
 
 export type CertificateInput = {
@@ -35,7 +35,7 @@ export function Certificate({ well, stages, funderName, cofunders }: Certificate
         <Text style={s.eyebrow}>BridgIT Water Foundation · Certificate of completion</Text>
         <Text style={s.title}>Clean water for {well.name}</Text>
         <Text style={s.sub}>
-          {[well.village, well.region, countryName(well.country)].filter(Boolean).join(", ")} · Project {well.code}
+          {[well.village, well.region, countryName(well.country)].filter(Boolean).join(", ")} · Well {well.code}
         </Text>
 
         <Text style={s.eyebrow}>Made possible by</Text>
@@ -44,7 +44,7 @@ export function Certificate({ well, stages, funderName, cofunders }: Certificate
         {others === 0 && <View style={{ marginBottom: 14 }} />}
 
         <Text style={s.body}>
-          This certifies that the water project at {well.name} was completed and handed over to the community
+          This certifies that the well at {well.name} was completed and handed over to the community
           {handover ? ` on ${fmtDate(handover)}` : ""}. A trained local water committee now owns and maintains the well,
           and our local partner stays in touch with the community.
         </Text>
@@ -62,7 +62,7 @@ export function Certificate({ well, stages, funderName, cofunders }: Certificate
 
         <View style={s.footer}>
           <Text>BridgIT Water Foundation · Australian Charity CH1853 · bridgitwater.org</Text>
-          <Text>Issued {fmtDate(new Date())}</Text>
+          <Text>Completed {handover ? fmtDate(handover) : well.completed_at ? fmtDate(well.completed_at) : fmtDate(new Date())}</Text>
         </View>
       </Page>
     </Document>
@@ -71,4 +71,12 @@ export function Certificate({ well, stages, funderName, cofunders }: Certificate
 
 export async function renderCertificate(input: CertificateInput): Promise<Buffer> {
   return renderToBuffer(<Certificate {...input} />);
+}
+
+/** A printable name: the sponsor line if the admin set one, else a real display name, else a warm generic. */
+export function certificateName(displayName: string | null, email: string, sponsorLine: string | null): string {
+  if (sponsorLine) return sponsorLine;
+  const local = email.split("@")[0].toLowerCase();
+  if (displayName && displayName.trim() && displayName.trim().toLowerCase() !== local) return displayName.trim();
+  return "A generous supporter";
 }
