@@ -1,8 +1,9 @@
 import "server-only";
 import { errorMessage } from "@/lib/supabase/admin";
 import { createAdminClient } from "../supabase/admin";
-import { STAGE_LABEL, type WellStage } from "../stages";
-import { fmtDate } from "../format";
+import { stageLabel, type WellStage } from "../stages";
+import { fmtDateIn } from "../format";
+import type { WellType } from "../types";
 import { APP_URL, esc, layout, sendEmail } from "./send";
 
 export type NotifyResult = { funderEmails: number; digestEmails: number; errors: string[] };
@@ -10,7 +11,10 @@ export type NotifyResult = { funderEmails: number; digestEmails: number; errors:
 /**
  * Sends the emails that are due:
  *  - to funders: one email per well per day, covering every published update whose 2-hour hold has passed
- *  - to admins: a daily digest of everything posted in the last 24h (once per day, after 17:00 UTC ≈ next morning in Fiji/AEST)
+ *  - to admins: a daily digest of everything posted in the last 24h (once per day, after 20:00 UTC ≈ 6–8am in Fiji/AEST)
+ *
+ * An update is marked notified only when every due email for its well was sent; if any send
+ * fails the update stays due and is retried next hour (the per-funder-per-day guard stops duplicates).
  */
 export async function runNotifications(): Promise<NotifyResult> {
   const db = createAdminClient();
@@ -20,14 +24,14 @@ export async function runNotifications(): Promise<NotifyResult> {
   // ---- Funder notices -------------------------------------------------------
   const due = await db
     .from("updates")
-    .select("id, well_id, body, stage, happened_at, wells(code, name), media(kind, hidden)")
+    .select("id, well_id, body, stage, happened_at, wells(code, name, country, well_type), media(kind, hidden)")
     .eq("status", "published")
     .is("notified_at", null)
     .lte("notify_after", now.toISOString())
     .order("happened_at");
   if (due.error) throw due.error;
 
-  type DueRow = { id: string; well_id: string; body: string | null; stage: WellStage | null; happened_at: string; wells: { code: string; name: string } | null; media: { kind: string; hidden: boolean }[] };
+  type DueRow = { id: string; well_id: string; body: string | null; stage: WellStage | null; happened_at: string; wells: { code: string; name: string; country: string; well_type: WellType } | null; media: { kind: string; hidden: boolean }[] };
   const byWell = new Map<string, DueRow[]>();
   for (const u of (due.data ?? []) as unknown as DueRow[]) byWell.set(u.well_id, [...(byWell.get(u.well_id) ?? []), u]);
 
@@ -48,13 +52,14 @@ export async function runNotifications(): Promise<NotifyResult> {
 
     const photos = updates.reduce((n, u) => n + u.media.filter((m) => m.kind === "photo" && !m.hidden).length, 0);
     const videos = updates.reduce((n, u) => n + u.media.filter((m) => m.kind === "video" && !m.hidden).length, 0);
-    const notes = updates.filter((u) => u.body).map((u) => `<p style="margin:0 0 10px"><strong>${fmtDate(u.happened_at)}${u.stage ? ` · ${STAGE_LABEL[u.stage]}` : ""}</strong><br>${esc(u.body!)}</p>`).join("");
+    const notes = updates.filter((u) => u.body).map((u) => `<p style="margin:0 0 10px"><strong>${fmtDateIn(well.country, u.happened_at)}${u.stage ? ` · ${stageLabel(u.stage, well.well_type)}` : ""}</strong><br>${esc(u.body!)}</p>`).join("");
     const what = [photos && `${photos} new photo${photos === 1 ? "" : "s"}`, videos && `${videos} new video${videos === 1 ? "" : "s"}`].filter(Boolean).join(" and ");
     const href = `${APP_URL}/wells/${well.code}`;
     const subject = `New from ${well.name}${what ? `: ${what}` : ""}`;
     const html = layout(`News from ${well.name}`, `${what ? `<p style="margin:0 0 12px">The team has posted ${what} from your well.</p>` : ""}${notes}`, href, "See the update");
-    const text = `News from ${well.name}\n\n${what ? `The team has posted ${what}.\n\n` : ""}${updates.filter((u) => u.body).map((u) => `${fmtDate(u.happened_at)}: ${u.body}`).join("\n\n")}\n\n${href}`;
+    const text = `News from ${well.name}\n\n${what ? `The team has posted ${what}.\n\n` : ""}${updates.filter((u) => u.body).map((u) => `${fmtDateIn(well.country, u.happened_at)}: ${u.body}`).join("\n\n")}\n\n${href}`;
 
+    let failed = 0;
     for (const f of (funders.data ?? []) as unknown as FRow[]) {
       if (!f.profiles?.notify_email || alreadyToday.has(f.profile_id)) continue;
       try {
@@ -62,10 +67,15 @@ export async function runNotifications(): Promise<NotifyResult> {
         await db.from("notifications").insert({ profile_id: f.profile_id, well_id: wellId, kind: "new_update", meta: { updates: updates.map((u) => u.id) } });
         result.funderEmails++;
       } catch (e) {
+        failed++;
         result.errors.push(`${f.profiles.email}: ${errorMessage(e)}`);
       }
     }
-    await db.from("updates").update({ notified_at: now.toISOString() }).in("id", updates.map((u) => u.id));
+    // Only close the loop when nothing failed; otherwise leave these updates due for the next run.
+    if (failed === 0) {
+      const { error } = await db.from("updates").update({ notified_at: now.toISOString() }).in("id", updates.map((u) => u.id));
+      if (error) result.errors.push(`mark notified (${well.code}): ${errorMessage(error)}`);
+    }
   }
 
   // ---- Admin digest ----------------------------------------------------------
@@ -86,8 +96,8 @@ export async function runNotifications(): Promise<NotifyResult> {
       const rows = (posted.data ?? []) as unknown as PRow[];
       if (rows.length === 0) continue;
 
-      const items = rows.map((r) => `<li><a href="${APP_URL}/admin/wells/${r.wells?.code}" style="color:#17607d;font-weight:600">${esc(r.wells?.name ?? "")}</a> <span style="color:#8a9ba3">${r.wells?.code} · ${r.media.length} file${r.media.length === 1 ? "" : "s"} · ${r.source}</span>${r.body ? `<br><span style="color:#51666f">${esc(r.body)}</span>` : ""}</li>`).join("");
-      const html = layout(`${rows.length} update${rows.length === 1 ? "" : "s"} posted yesterday`, `<ul style="padding-left:18px;margin:0">${items}</ul>`, `${APP_URL}/admin`, "Open admin");
+      const items = rows.map((r) => `<li><a href="${APP_URL}/admin/wells/${r.wells?.code}" style="color:#17607d;font-weight:600">${esc(r.wells?.name ?? "")}</a> <span style="color:#66787f">${r.wells?.code} · ${r.media.length} file${r.media.length === 1 ? "" : "s"} · ${r.source}</span>${r.body ? `<br><span style="color:#51666f">${esc(r.body)}</span>` : ""}</li>`).join("");
+      const html = layout(`${rows.length} update${rows.length === 1 ? "" : "s"} in the last 24 hours`, `<ul style="padding-left:18px;margin:0">${items}</ul>`, `${APP_URL}/admin`, "Open admin");
       try {
         await sendEmail(a.email, `WellWatch digest: ${rows.length} update${rows.length === 1 ? "" : "s"}`, html, rows.map((r) => `${r.wells?.name} (${r.wells?.code}): ${r.media.length} files${r.body ? ` — ${r.body}` : ""}`).join("\n"));
         await db.from("notifications").insert({ profile_id: a.id, kind: "digest", meta: { count: rows.length } });
