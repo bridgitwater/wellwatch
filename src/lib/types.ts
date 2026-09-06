@@ -83,6 +83,8 @@ export type Well = {
   partner_org_id: string | null;
   drive_folder_id: string | null;
   folder_is_public: boolean;
+  /** Public example page at /example/<code> (no sign-in; gift details hidden). */
+  showcase: boolean;
   target_cost: string | null;
   currency: string;
   updated_at: string;
@@ -105,7 +107,7 @@ export const WELL_COLUMNS = [
   "source_type", "pump_type", "dedication", "summary", "before_story", "before_distance_km",
   "after_distance_m", "hours_saved_day", "impacts", "wuc_members", "wuc_women", "wuc_youth", "wuc_pwd",
   "wuc_treasurer_woman", "training_note", "sustainability", "challenges", "lessons", "plaque_installed",
-  "completed_at", "report_file_id", "partner_org_id", "drive_folder_id", "folder_is_public", "target_cost",
+  "completed_at", "report_file_id", "partner_org_id", "drive_folder_id", "folder_is_public", "showcase", "target_cost",
   "currency", "created_at", "updated_at",
 ].join(", ");
 

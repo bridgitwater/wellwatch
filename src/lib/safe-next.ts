@@ -8,7 +8,6 @@ export function safeNext(raw: unknown, fallback = "/wells"): string {
   const s = raw.trim();
   if (!s.startsWith("/")) return fallback;
   if (s.startsWith("//") || s.startsWith("/\\")) return fallback;
-  // eslint-disable-next-line no-control-regex
   if (/[\x00-\x1f\x7f\s]/.test(s)) return fallback;
   if (/^\/[^/?#]*:/.test(s)) return fallback; // "/javascript:..." style oddities
   if (s.length > 2000) return fallback;

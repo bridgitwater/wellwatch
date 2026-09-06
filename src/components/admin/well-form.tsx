@@ -111,6 +111,20 @@ export function WellForm({ well, orgs }: { well?: Well & Partial<WellPrivate>; o
         </label>
       </Section>
 
+      <Section title="Public example page" hint="For showing supporters and partners what a finished well looks like. Anyone with the link can view it without signing in; the funder's gift amount, dedication and cost breakdown are not shown.">
+        <label className="flex items-center gap-2 text-sm sm:col-span-2">
+          <input type="checkbox" name="showcase" defaultChecked={w?.showcase ?? false} /> Publish this well as a public example
+        </label>
+        {w?.showcase && (
+          <p className="sm:col-span-2 text-sm">
+            Public link:{" "}
+            <a className="underline text-water" href={`/example/${w.code}`} target="_blank" rel="noreferrer">
+              {typeof window !== "undefined" ? window.location.origin : ""}/example/{w.code}
+            </a>
+          </p>
+        )}
+      </Section>
+
       <div className="sm:col-span-2 flex items-center gap-4 sticky bottom-0 bg-surface py-3 border-t border-line">
         <Button type="submit" disabled={pending}>{pending ? "Saving…" : w ? "Save changes" : "Create well"}</Button>
         <Notice result={state} />

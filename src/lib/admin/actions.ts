@@ -50,6 +50,7 @@ const wellSchema = z.object({
   target_cost: optNum,
   currency: str(3).default("AUD").transform((s) => s.toUpperCase()),
   folder_is_public: z.preprocess((v) => v === "on" || v === "true", z.boolean()),
+  showcase: z.preprocess((v) => v === "on" || v === "true", z.boolean()),
   // Completion-report fields
   well_type: z.enum(["drilled", "hand_drilled", "refurbished", "solar_system", "piped_scheme", "other"]).default("drilled"),
   program_name: optStr(200),
