@@ -1,17 +1,20 @@
+import { cache } from "react";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "./supabase/server";
 import { fixtureMyWells, fixtureProfile, fixtureWells, fixturesEnabled } from "./fixtures";
 import { type Cost, type Funding, type MyWellRow, type Partner, type Profile, type StageRow, type Testimonial, type Update, type WaterTest, type Well, WELL_COLUMNS } from "./types";
 
-export async function getProfile(): Promise<Profile | null> {
+/** Cached per request: layout, page and metadata all ask for it. */
+export const getProfile = cache(async function getProfile(): Promise<Profile | null> {
   if (fixturesEnabled()) return fixtureProfile;
   const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return null;
   const { data } = await supabase.from("profiles").select("*").eq("id", auth.user.id).single();
   return (data as Profile) ?? null;
-}
+});
 
-export async function getMyWells(): Promise<MyWellRow[]> {
+export const getMyWells = cache(async function getMyWells(): Promise<MyWellRow[]> {
   if (fixturesEnabled()) return fixtureMyWells;
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -20,7 +23,7 @@ export async function getMyWells(): Promise<MyWellRow[]> {
     .order("last_update_at", { ascending: false, nullsFirst: false });
   if (error) throw error;
   return data as MyWellRow[];
-}
+});
 
 export type WellPage = {
   well: Well;
@@ -34,19 +37,31 @@ export type WellPage = {
   testimonials: Testimonial[];
 };
 
-export async function getWellPage(code: string): Promise<WellPage | null> {
+/** The signed-in user's view of a well (RLS decides whether they may see it). Cached per request. */
+export const getWellPage = cache(async function getWellPage(code: string): Promise<WellPage | null> {
   if (fixturesEnabled()) return fixtureWells[code] ?? null;
   const supabase = await createClient();
-  const { data: wellRow } = await supabase.from("wells").select(WELL_COLUMNS).eq("code", code).maybeSingle();
+  const { data: wellRow, error } = await supabase.from("wells").select(WELL_COLUMNS).eq("code", code).maybeSingle();
+  if (error) throw error; // e.g. a new column without a grant — surface it, don't show "not found"
   const well = wellRow as unknown as Well | null;
   if (!well) return null;
+  return loadWellPage(supabase, well);
+});
 
+/**
+ * Loads everything the funder page shows for a well. Only published updates and
+ * visible media are returned regardless of who is asking — RLS already hides
+ * them from funders, but admins bypass RLS and must see exactly the same page.
+ */
+export async function loadWellPage(supabase: SupabaseClient, well: Well): Promise<WellPage> {
   const [stages, updates, costs, tests, funding, cofunders, partner, testimonials] = await Promise.all([
     supabase.from("stages").select("stage, reached_at, expected_at, note").eq("well_id", well.id),
     supabase
       .from("updates")
       .select("id, stage, body, happened_at, source, media(id, drive_file_id, kind, mime, name, width, height, duration_s, taken_at, caption, tag)")
       .eq("well_id", well.id)
+      .eq("status", "published")
+      .eq("media.hidden", false)
       .order("happened_at", { ascending: false }),
     supabase.from("costs").select("category, amount, currency, note").eq("well_id", well.id),
     supabase.from("water_tests").select("*").eq("well_id", well.id).order("tested_at", { ascending: false }),
