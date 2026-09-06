@@ -6,7 +6,7 @@
   --surface: #ffffff;
   --ink: #16232b;
   --ink-2: #51666f;
-  --ink-3: #8a9ba3;
+  --ink-3: #66787f;   /* ≥4.5:1 on white and on --bg (AA for small text) */
   --line: #dbe4e8;
   --water: #17607d;
   --water-deep: #0f4a62;
@@ -53,6 +53,18 @@ h1, h2, h3, .display {
 }
 
 .tnum { font-variant-numeric: tabular-nums; }
+
+/* Body copy inside panels: one size everywhere instead of ad-hoc text-[15px]. */
+.prose-body { font-size: 0.9375rem; line-height: 1.65; }
+
+/* Section heading used by every panel on the well page. */
+.panel-h { font-size: 1.125rem; line-height: 1.3; font-weight: 700; }
+
+@media print {
+  header, footer, nav, .no-print { display: none !important; }
+  body { background: #fff; }
+  .rounded-xl { break-inside: avoid; }
+}
 
 :focus-visible {
   outline: 2px solid var(--water);

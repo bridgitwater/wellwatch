@@ -7,7 +7,7 @@ export function PartnerPanel({ partner }: { partner: Partner | null }) {
   const site = partner.website ? partner.website.replace(/^https?:\/\//, "").replace(/\/$/, "") : null;
   return (
     <section aria-labelledby="partner-h" className="rounded-xl border border-line bg-surface p-5">
-      <h2 id="partner-h" className="text-xs uppercase tracking-wide text-ink-3 font-semibold">Implementing partner</h2>
+      <h2 id="partner-h" className="text-lg font-bold">Built by our local partner</h2>
       <div className="mt-2 flex items-start gap-3">
         {partner.logo_file_id && (
           <DriveImage fileId={partner.logo_file_id} alt="" width={160} className="h-12 w-12 rounded object-contain bg-bg shrink-0" />

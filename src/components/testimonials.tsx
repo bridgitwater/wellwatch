@@ -9,7 +9,7 @@ export function Testimonials({ items, place }: { items: Testimonial[]; place: st
       <div className={`grid gap-4 ${items.length > 1 ? "md:grid-cols-2" : ""}`}>
         {items.map((t) => (
           <figure key={t.id} className="rounded-xl border border-line bg-surface p-5 flex flex-col">
-            <blockquote className="text-[15px] leading-relaxed flex-1">
+            <blockquote className="prose-body flex-1">
               <span className="display text-3xl text-water leading-none align-top mr-1" aria-hidden="true">&ldquo;</span>
               {t.quote}
             </blockquote>

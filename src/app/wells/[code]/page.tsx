@@ -87,7 +87,7 @@ export default async function WellPage({ params }: PageProps<"/wells/[code]">) {
             <section aria-labelledby="before-h" className="rounded-xl border border-line bg-surface overflow-hidden">
               <div className="p-5">
                 <h2 id="before-h" className="text-lg font-bold">Before</h2>
-                {well.before_story && <p className="text-[15px] leading-relaxed mt-2 max-w-prose whitespace-pre-line">{well.before_story}</p>}
+                {well.before_story && <p className="prose-body mt-2 max-w-prose whitespace-pre-line">{well.before_story}</p>}
               </div>
               {beforePhotos.length > 0 && (
                 <div className={`grid gap-px bg-line ${beforePhotos.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
@@ -116,20 +116,20 @@ export default async function WellPage({ params }: PageProps<"/wells/[code]">) {
               {well.challenges && (
                 <div className="mt-3">
                   <h3 className="text-sm font-semibold text-ink-2">Challenges</h3>
-                  <p className="text-[15px] leading-relaxed mt-1 whitespace-pre-line">{well.challenges}</p>
+                  <p className="prose-body mt-1 whitespace-pre-line">{well.challenges}</p>
                 </div>
               )}
               {well.lessons && (
                 <div className="mt-3">
                   <h3 className="text-sm font-semibold text-ink-2">What we learned</h3>
-                  <p className="text-[15px] leading-relaxed mt-1 whitespace-pre-line">{well.lessons}</p>
+                  <p className="prose-body mt-1 whitespace-pre-line">{well.lessons}</p>
                 </div>
               )}
             </section>
           )}
         </div>
 
-        <aside className="flex flex-col gap-6 lg:sticky lg:top-6">
+        <aside className="flex flex-col gap-6">
           <GiftPanel well={well} funding={funding} costs={costs} cofunders={cofunders} plaque={plaque} />
           <CommunityPanel well={well} tests={waterTests} />
           <PartnerPanel partner={partner} />

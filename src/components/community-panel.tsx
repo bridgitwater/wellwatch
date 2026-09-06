@@ -25,7 +25,7 @@ export function CommunityPanel({ well, tests }: { well: Well; tests: WaterTest[]
         </div>
       )}
 
-      {well.summary && <p className="text-[15px] leading-relaxed mt-4">{well.summary}</p>}
+      {well.summary && <p className="prose-body mt-4">{well.summary}</p>}
 
       <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
         {facts.map(([k, v]) => (

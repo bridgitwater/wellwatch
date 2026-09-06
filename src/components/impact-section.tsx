@@ -26,7 +26,7 @@ export function ImpactSection({ well }: { well: Well }) {
 
       {(hasWuc || well.training_note || well.sustainability) && (
         <div className="mt-5 pt-5 border-t border-line">
-          <h3 className="font-semibold">Owned by the community</h3>
+          <h3 className="text-sm font-semibold">Owned by the community</h3>
           {hasWuc && (
             <div className="mt-3 flex flex-wrap gap-2">
               <Chip n={well.wuc_members!} label="committee members" />
@@ -36,8 +36,8 @@ export function ImpactSection({ well }: { well: Well }) {
               {well.wuc_treasurer_woman && <span className="rounded-full bg-aquifer text-water-deep text-sm px-3 py-1">Treasurer is a woman</span>}
             </div>
           )}
-          {well.training_note && <p className="text-[15px] leading-relaxed mt-3">{well.training_note}</p>}
-          {well.sustainability && <p className="text-[15px] leading-relaxed mt-3 text-ink-2">{well.sustainability}</p>}
+          {well.training_note && <p className="prose-body mt-3">{well.training_note}</p>}
+          {well.sustainability && <p className="prose-body mt-3 text-ink-2">{well.sustainability}</p>}
           {hasWuc && !well.training_note && (
             <p className="text-sm text-ink-2 mt-3">
               A trained Water User Committee looks after the pump, collects a small user fee for repairs, and runs hygiene and sanitation training in the village.

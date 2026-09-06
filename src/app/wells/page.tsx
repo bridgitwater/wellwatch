@@ -73,7 +73,7 @@ export default async function MyWellsPage() {
                     </div>
                     <div>
                       <dt className="text-ink-3 text-xs">Funded</dt>
-                      <dd className="font-semibold">{fmtDate(w.funded_at, { year: undefined })}</dd>
+                      <dd className="font-semibold">{fmtDate(w.funded_at)}</dd>
                     </div>
                   </dl>
                 </div>

@@ -29,9 +29,9 @@ export function UpdateFeed({ updates, wellName, country, type = "drilled", title
               <time dateTime={u.happened_at} className="font-semibold">
                 {fmtDateIn(country, u.happened_at)}
               </time>
-              {u.stage && <span className="text-ink-2">{stageLabel(u.stage, type)}</span>}
+              {u.stage && <span className="text-xs font-semibold rounded-full bg-aquifer text-water-deep px-2 py-0.5">{stageLabel(u.stage, type)}</span>}
             </div>
-            {u.body && <p className="px-5 pb-4 text-[15px] leading-relaxed max-w-prose">{u.body}</p>}
+            {u.body && <p className="px-5 pb-4 prose-body max-w-prose">{u.body}</p>}
             <MediaGrid media={u.media} wellName={wellName} onOpen={setOpen} />
           </li>
         ))}
@@ -56,7 +56,7 @@ function MediaGrid({ media, wellName, onOpen }: { media: Media[]; wellName: stri
               key={m.id}
               type="button"
               onClick={() => onOpen(m)}
-              className={`block bg-surface ${photos.length === 1 ? "aspect-[4/3]" : "aspect-square"} overflow-hidden focus-visible:outline-offset-[-3px]`}
+              className={`block bg-surface ${photos.length === 1 ? "aspect-[3/2] max-h-[480px] w-full" : "aspect-square"} overflow-hidden focus-visible:outline-offset-[-3px]`}
               aria-label={m.caption ?? `Open photo from ${wellName}`}
             >
               <DriveImage fileId={m.drive_file_id} alt={m.caption ?? `${wellName} well`} width={photos.length === 1 ? 1200 : 640}

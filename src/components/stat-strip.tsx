@@ -6,7 +6,8 @@ export function StatStrip({ well }: { well: Well }) {
   const stats: { k: string; v: string; sub?: string }[] = [];
   if (well.households) stats.push({ k: "Households", v: fmtInt(well.households) });
   if (well.people_served) {
-    stats.push({ k: "People served", v: fmtInt(well.people_served), sub: well.households ? "about 6 per household" : undefined });
+    const perHh = well.households ? Math.round(well.people_served / well.households) : null;
+    stats.push({ k: "People served", v: fmtInt(well.people_served), sub: perHh && perHh > 1 ? `about ${perHh} per household` : undefined });
   }
   if (well.before_distance_km != null || well.after_distance_m != null) {
     const before = well.before_distance_km != null ? `${Number(well.before_distance_km)} km` : "—";
@@ -25,7 +26,7 @@ export function StatStrip({ well }: { well: Well }) {
       {stats.map((s) => (
         <div key={s.k} className="bg-surface px-5 py-4">
           <dt className="text-xs uppercase tracking-wide text-ink-3 font-semibold">{s.k}</dt>
-          <dd className="display text-xl sm:text-3xl font-bold tnum mt-1 leading-none whitespace-nowrap">{s.v}</dd>
+          <dd className="display text-xl sm:text-3xl font-bold tnum mt-1 leading-tight break-words">{s.v}</dd>
           {s.sub && <dd className="text-xs text-ink-3 mt-1.5">{s.sub}</dd>}
         </div>
       ))}
