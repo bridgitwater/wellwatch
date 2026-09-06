@@ -36,7 +36,7 @@ export function WellForm({ well, orgs }: { well?: Well & Partial<WellPrivate>; o
           {Object.entries(WELL_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </Select>
       </Field>
-      <Field label="Partner organization">
+      <Field label="Partner organisation">
         <Select name="partner_org_id" defaultValue={w?.partner_org_id ?? ""}>
           <option value="">—</option>
           {orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}

@@ -55,16 +55,16 @@ export default async function WellPage({ params }: PageProps<"/wells/[code]">) {
             {WELL_TYPE_LABEL[well.well_type]} · {[well.region, countryName(well.country)].filter(Boolean).join(", ")}
           </p>
           <div className="flex flex-wrap items-center gap-3 text-sm text-ink-2 mt-3">
-            <StagePill stage={well.status} />
+            <StagePill stage={well.status} type={well.well_type} />
             <span className="font-mono text-xs tracking-wide">{well.code}</span>
-            {well.sponsor_line && <span>Sponsored by {well.sponsor_line}</span>}
+            {well.sponsor_line && <span>Funded by {well.sponsor_line}</span>}
           </div>
           <p className="text-sm text-ink-3 mt-3">
             {complete
               ? `Completed${well.completed_at ? ` ${fmtDate(well.completed_at)}` : ""} and in the community's hands.`
               : latest
                 ? `Last update ${fmtRelative(latest.happened_at)}.`
-                : "Waiting for the first update from the field."}
+                : "The first update from the field is on its way."}
           </p>
         </div>
         {cover && (
@@ -112,7 +112,7 @@ export default async function WellPage({ params }: PageProps<"/wells/[code]">) {
 
           {(well.challenges || well.lessons) && (
             <section aria-labelledby="notes-h" className="rounded-xl border border-line bg-surface p-5">
-              <h2 id="notes-h" className="text-lg font-bold">Honest notes from the team</h2>
+              <h2 id="notes-h" className="text-lg font-bold">Notes from the team</h2>
               {well.challenges && (
                 <div className="mt-3">
                   <h3 className="text-sm font-semibold text-ink-2">Challenges</h3>

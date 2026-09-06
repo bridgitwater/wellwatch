@@ -46,7 +46,7 @@ export function Certificate({ well, stages, funderName, cofunders }: Certificate
         <Text style={s.body}>
           This certifies that the water project at {well.name} was completed and handed over to the community
           {handover ? ` on ${fmtDate(handover)}` : ""}. A trained local water committee now owns and maintains the well,
-          and BridgIT will continue to monitor it.
+          and our local partner stays in touch with the community.
         </Text>
 
         {well.dedication && <Text style={s.dedication}>{well.dedication}</Text>}

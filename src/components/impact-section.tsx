@@ -31,7 +31,7 @@ export function ImpactSection({ well }: { well: Well }) {
             <div className="mt-3 flex flex-wrap gap-2">
               <Chip n={well.wuc_members!} label="committee members" />
               {well.wuc_women != null && <Chip n={well.wuc_women} label="women" />}
-              {well.wuc_youth != null && <Chip n={well.wuc_youth} label="youth" />}
+              {well.wuc_youth != null && <Chip n={well.wuc_youth} label="young people" />}
               {well.wuc_pwd != null && <Chip n={well.wuc_pwd} label={well.wuc_pwd === 1 ? "person with a disability" : "people with disabilities"} />}
               {well.wuc_treasurer_woman && <span className="rounded-full bg-aquifer text-water-deep text-sm px-3 py-1">Treasurer is a woman</span>}
             </div>
@@ -40,7 +40,7 @@ export function ImpactSection({ well }: { well: Well }) {
           {well.sustainability && <p className="prose-body mt-3 text-ink-2">{well.sustainability}</p>}
           {hasWuc && !well.training_note && (
             <p className="text-sm text-ink-2 mt-3">
-              A trained Water User Committee looks after the pump, collects a small user fee for repairs, and runs hygiene and sanitation training in the village.
+              A trained community water committee looks after the pump and keeps it in good repair, so the well keeps serving the village for decades.
             </p>
           )}
         </div>

@@ -11,7 +11,7 @@ export function LoginForm({ next }: { next: string }) {
       <div className="rounded-xl bg-aquifer px-5 py-5">
         <div className="font-semibold text-water-deep">Check your email</div>
         <p className="text-sm text-ink-2 mt-1">
-          If <span className="font-medium text-ink">{state.email}</span> is on our list, a sign-in link is on its way.
+          If <span className="font-medium text-ink">{state.email}</span> is linked to a well, a sign-in link is on its way.
           It works once and expires in an hour.
         </p>
       </div>

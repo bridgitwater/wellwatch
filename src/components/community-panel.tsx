@@ -41,7 +41,7 @@ export function CommunityPanel({ well, tests }: { well: Well; tests: WaterTest[]
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold">Water quality</h3>
             <span className={`text-xs font-semibold rounded-full px-2 py-0.5 ${latest.passed ? "bg-ok-soft text-ok" : "bg-clay-soft text-clay"}`}>
-              {latest.passed ? "Safe to drink" : latest.passed === false ? "Retest scheduled" : "Tested"}
+              {latest.passed ? "Safe to drink" : latest.passed === false ? "Being treated" : "Tested"}
             </span>
           </div>
           <div className="text-xs text-ink-3 mt-0.5">

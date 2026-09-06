@@ -14,7 +14,7 @@ export function UpdateFeed({ updates, wellName, country, type = "drilled", title
     return (
       <section className="rounded-xl border border-dashed border-line p-6 text-center text-ink-2">
         <div className="font-semibold text-ink">No updates yet</div>
-        <p className="text-sm mt-1">The first photos usually arrive within a couple of weeks of funding.</p>
+        <p className="text-sm mt-1">Photos and notes from our local partner appear here as work begins. We&apos;ll email you when the first ones arrive.</p>
       </section>
     );
   }

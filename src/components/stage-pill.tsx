@@ -1,6 +1,7 @@
-import { STAGE_LABEL, type WellStage } from "@/lib/stages";
+import { stageLabel, type WellStage } from "@/lib/stages";
+import type { WellType } from "@/lib/types";
 
-export function StagePill({ stage }: { stage: WellStage }) {
+export function StagePill({ stage, type = "drilled" }: { stage: WellStage; type?: WellType }) {
   const done = stage === "handover";
   return (
     <span
@@ -9,7 +10,7 @@ export function StagePill({ stage }: { stage: WellStage }) {
       }`}
     >
       <span className={`h-1.5 w-1.5 rounded-full ${done ? "bg-ok" : "bg-water"}`} />
-      {done ? "Complete" : STAGE_LABEL[stage]}
+      {done ? "Complete" : stageLabel(stage, type)}
     </span>
   );
 }

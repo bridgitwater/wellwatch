@@ -19,19 +19,19 @@ export const STAGE_LABEL: Record<WellStage, string> = {
   funded: "Funded",
   survey: "Site survey",
   drilling: "Drilling",
-  pump_apron: "Pump & apron",
+  pump_apron: "Pump & platform",
   water_flowing: "Water flowing",
-  handover: "Handover",
+  handover: "Handed to the community",
 };
 
 /** One-line, funder-facing description of what happens in each stage. */
 export const STAGE_BLURB: Record<WellStage, string> = {
-  funded: "Your gift is in. The partner team schedules the site visit.",
-  survey: "A hydrogeologist and the community agree where the borehole goes.",
-  drilling: "The rig arrives and drills until it hits clean water.",
-  pump_apron: "The hand pump is fitted and a concrete apron keeps the site clean.",
-  water_flowing: "First water. Yield and quality are tested.",
-  handover: "A trained water committee takes ownership for the long term.",
+  funded: "Your gift has been received. Our local partner schedules the site visit.",
+  survey: "A hydrogeologist and the community agree where the well goes.",
+  drilling: "The rig arrives and drills down to the water-bearing rock, usually 40–80 metres.",
+  pump_apron: "The hand pump is fitted and a concrete platform keeps the site clean and dry.",
+  water_flowing: "First water. The flow and water quality are tested.",
+  handover: "A trained community water committee takes over caring for the well.",
 };
 
 export function stageIndex(stage: WellStage) {
@@ -71,7 +71,7 @@ export function stageBlurb(stage: WellStage, type: WellType = "drilled"): string
   if (type === "refurbished") {
     return ({
       survey: "The team inspects the broken well and agrees the repair with the community.",
-      drilling: "Old rods, pipes and cylinder come out; the borehole is flushed and checked.",
+      drilling: "Old rods, pipes and cylinder come out; the well is flushed and checked.",
       pump_apron: "A new pump head and downhole parts go in; the platform and drainage are rebuilt.",
     } as Partial<Record<WellStage, string>>)[stage] ?? STAGE_BLURB[stage];
   }

@@ -17,9 +17,11 @@ export function GiftPanel({ well, funding, costs, cofunders, plaque }: { well: W
         {funding?.funded_at && <span className="text-sm text-ink-2">given {fmtDate(funding.funded_at)}</span>}
       </div>
       <p className="text-sm text-ink-2 mt-1">
-        {others === 0
-          ? "You funded this project in full."
-          : `You and ${others} other${others === 1 ? "" : "s"} funded this project together.`}
+        {!funding
+          ? "Thank you for making this well possible."
+          : others === 0
+            ? "You funded this well in full."
+            : `You and ${others} other${others === 1 ? "" : "s"} funded this well together.`}
       </p>
 
       {well.dedication && (
@@ -52,7 +54,7 @@ export function GiftPanel({ well, funding, costs, cofunders, plaque }: { well: W
               .map((c) => {
                 const pct = total ? (Number(c.amount) / total) * 100 : 0;
                 return (
-                  <li key={c.category} className="text-sm">
+                  <li key={`${c.category}-${c.note ?? ""}-${c.amount}`} className="text-sm">
                     <div className="flex justify-between gap-3">
                       <span>{COST_LABEL[c.category]}</span>
                       <span className="tnum text-ink-2">{fmtMoney(c.amount, c.currency)}</span>

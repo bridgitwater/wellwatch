@@ -60,7 +60,7 @@ export default async function MyWellsPage() {
                         {WELL_TYPE_LABEL[w.well_type]} · {w.region ? `${w.region}, ` : ""}{countryName(w.country)}
                       </div>
                     </div>
-                    <StagePill stage={w.status} />
+                    <StagePill stage={w.status} type={w.well_type} />
                   </div>
                   <dl className="mt-3 flex gap-5 text-sm">
                     <div>
