@@ -9,13 +9,7 @@ Everything runs on free tiers. Do these once, in order.
 3. **Authentication → URL Configuration**
    - Site URL: `https://wellwatch.bridgitwater.org`
    - Redirect URLs: `https://wellwatch.bridgitwater.org/auth/callback`, `https://wellwatch.bridgitwater.org/auth/complete`, `http://localhost:3000/auth/callback`, `http://localhost:3000/auth/complete`
-4. **Authentication → Email Templates → Magic Link** — replace the body with something like:
-   ```html
-   <h2>Sign in to WellWatch</h2>
-   <p>Click the link below to see your well. It works once and expires in an hour.</p>
-   <p><a href="{{ .ConfirmationURL }}">Sign in to WellWatch</a></p>
-   <p>If you didn't request this, you can ignore it.</p>
-   ```
+4. **Authentication → Emails → Magic link or OTP** — subject `Your WellWatch sign-in link`; paste the body from `supabase/email-templates/magic-link.html` (uses `{{ .ConfirmationURL }}`).
 5. **Authentication → SMTP Settings** (so magic links come from bridgitwater.org, not Supabase's shared sender): enable custom SMTP with Resend —
    host `smtp.resend.com`, port `465`, user `resend`, password = your Resend API key, sender `wells@bridgitwater.org`, name `WellWatch`.
 6. **Authentication → Providers → Email**: keep "Confirm email" on; **turn off** "Allow new users to sign up" — only admins create funders.
