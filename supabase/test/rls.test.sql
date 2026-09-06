@@ -57,6 +57,22 @@ do $$ begin
   perform pg_temp.assert(not exists (select 1 from wells where name = 'x'), 'funder update to wells had no effect');
 end $$;
 
+-- Funder may change display_name / notify_email but not email / role / org ----------
+update profiles set display_name = 'Maggie', notify_email = false where id = auth.uid();
+select pg_temp.assert((select display_name from profiles where id = auth.uid()) = 'Maggie', 'funder can rename herself');
+do $$ begin
+  update profiles set email = 'someone-else@example.com' where id = auth.uid();
+  raise exception 'ASSERT FAILED: funder changed her email';
+exception when insufficient_privilege then null; end $$;
+do $$ begin
+  update profiles set role = 'admin' where id = auth.uid();
+  raise exception 'ASSERT FAILED: funder changed her role';
+exception when insufficient_privilege then null; end $$;
+do $$ begin
+  update profiles set organization_id = '00000000-0000-0000-0000-000000000002' where id = auth.uid();
+  raise exception 'ASSERT FAILED: funder changed her organisation';
+exception when insufficient_privilege then null; end $$;
+
 -- Hidden update is invisible to funders ------------------------------------------
 reset role; select set_config('request.jwt.claim.sub', '', true);
 update updates set status = 'hidden' where id = '30000000-0000-0000-0000-000000000002';
