@@ -7,8 +7,8 @@ Everything runs on free tiers. Do these once, in order.
 1. supabase.com → New project `wellwatch`, region Sydney. Save the database password.
 2. **SQL Editor** → paste and run each file in `supabase/migrations/` in filename order. (Or `supabase link` + `supabase db push` with the CLI.)
 3. **Authentication → URL Configuration**
-   - Site URL: `https://wells.bridgitwater.org`
-   - Redirect URLs: `https://wells.bridgitwater.org/auth/callback`, `http://localhost:3000/auth/callback`
+   - Site URL: `https://wellwatch.bridgitwater.org`
+   - Redirect URLs: `https://wellwatch.bridgitwater.org/auth/callback`, `https://wellwatch.bridgitwater.org/auth/complete`, `http://localhost:3000/auth/callback`, `http://localhost:3000/auth/complete`
 4. **Authentication → Email Templates → Magic Link** — replace the body with something like:
    ```html
    <h2>Sign in to WellWatch</h2>
@@ -51,14 +51,14 @@ Folder naming: `UG-2026-014 · Kyabirwa` — the code at the start is what the s
    | `NEXT_PUBLIC_SUPABASE_URL` | from Supabase |
    | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | from Supabase |
    | `SUPABASE_SERVICE_ROLE_KEY` | from Supabase (secret) |
-   | `NEXT_PUBLIC_APP_URL` | `https://wells.bridgitwater.org` |
+   | `NEXT_PUBLIC_APP_URL` | `https://wellwatch.bridgitwater.org` |
    | `GOOGLE_SERVICE_ACCOUNT_JSON_B64` | step 2.5 |
    | `DRIVE_SHARED_DRIVE_ID` | step 2.6 |
    | `RESEND_API_KEY` | step 3 |
    | `EMAIL_FROM` | `WellWatch <wells@bridgitwater.org>` |
    | `CRON_SECRET` | any long random string: `openssl rand -hex 32` |
 
-2. Deploy. Then **Settings → Domains** → add `wells.bridgitwater.org` and create the CNAME it asks for at your DNS provider.
+2. Deploy. Then **Settings → Domains** → add `wellwatch.bridgitwater.org` and create the CNAME it asks for at your DNS provider.
 
 ## 5. Scheduler (Supabase Cron)
 

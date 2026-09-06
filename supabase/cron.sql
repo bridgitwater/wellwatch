@@ -16,7 +16,7 @@ create extension if not exists pg_net;
 -- 1. Secrets live in Vault, not in cron.job.command (which is readable by admins).
 do $$
 declare
-  v_url    text := 'https://wells.bridgitwater.org';   -- NEXT_PUBLIC_APP_URL
+  v_url    text := 'https://wellwatch.bridgitwater.org';   -- NEXT_PUBLIC_APP_URL
   v_secret text := '<CRON_SECRET>';                    -- same value as Vercel's CRON_SECRET
   sid uuid;
 begin
