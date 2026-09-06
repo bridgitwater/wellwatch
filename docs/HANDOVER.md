@@ -44,7 +44,7 @@ Scale: medium — 50 to 500 funders and wells. Budget: free tiers wherever possi
 | Database + auth | Supabase org **Bridgitwater**, project **wellwatch**, ref `agclpkpfjdmmfpycgdvf`, Sydney | Free plan. Postgres with row-level security. |
 | Media | Google Shared Drive **"Wells"** (id `0AMVDXq5ga-yoUk9PVA`) on the bridgitwater.org Workspace | One folder per well: `MW-2025-019 · Ngoleka`. |
 | Drive access | GCP project `wellwatch-507704`, service account `wellwatch-sync@wellwatch-507704.iam.gserviceaccount.com` (Content manager on the Wells drive) | Key is in Vercel as `GOOGLE_SERVICE_ACCOUNT_JSON_B64`. |
-| Email | **Resend**, team "bridgitwater", domain bridgitwater.org verified, sends as `WellWatch <wells@bridgitwater.org>` | Supabase Auth uses Resend SMTP for sign-in links; the app uses the Resend API for notifications. |
+| Email | **Resend**, team "bridgitwater", domain bridgitwater.org verified, sends as `WellWatch <wellwatch@bridgitwater.org>` | Supabase Auth uses Resend SMTP for sign-in links; the app uses the Resend API for notifications. |
 | Schedulers | **Supabase Cron** (pg_cron + pg_net): `wellwatch-drive-sync` every 10 min, `wellwatch-notify` hourly at :05 | GitHub Actions workflows remain as manual fallbacks only. |
 | Completion reports (source material) | OneDrive on Dusty's Mac: `~/Library/CloudStorage/OneDrive-Personal/Shortcuts/BWF OneDrive/A. Country Programs/<Country>/…Completed Projects/` (~321 files); a full copy also lives in info@bridgitwater.org's Drive as "BWF Archive (from Wendy OneDrive)" | Samples in `~/Documents/Bridgitwater/_reports_sample/`. |
 | Roadmap & review | Artifacts "WellWatch Build Plan", "WellWatch Roadmap"; review report `wellwatch-review.md` (delivered 6 Sep) | |
@@ -95,6 +95,7 @@ Done and live: everything above, including Phase 0 of the roadmap (sync reliabil
 - Housekeeping: GitHub Actions secrets `APP_URL`/`CRON_SECRET` still hold old values (manual fallback only); revoke the old `wellwatch-claude` GitHub token and delete `wellwatch-push` when not needed; re-add Organization Administrator role in GCP; Vercel deployment protection for `*.vercel.app` URLs; clear `_to_delete/` folders on the Mac.
 - Decide budget stance: US$0 vs ~US$40/mo (Vercel Pro + Resend Pro) as funders grow.
 - Decide whether the public example page should name the sponsoring family (it currently shows the `sponsor_line`).
+- Make sure `wellwatch@bridgitwater.org` exists as a mailbox or alias in Google Workspace (it is now the sender and the contact address in every email and page footer).
 
 ---
 

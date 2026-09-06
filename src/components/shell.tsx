@@ -38,7 +38,7 @@ export function Shell({ profile, children }: { profile: Profile | null; children
         <div className="mx-auto max-w-5xl px-5 py-6 text-xs text-ink-3 flex flex-wrap gap-x-4 gap-y-1">
           <span>Bridgit Water Foundation · Australian Charity CH1853</span>
           <a className="hover:text-ink-2" href="https://bridgitwater.org">bridgitwater.org</a>
-          <a className="hover:text-ink-2" href="mailto:wells@bridgitwater.org">wells@bridgitwater.org</a>
+          <a className="hover:text-ink-2" href="mailto:wellwatch@bridgitwater.org">wellwatch@bridgitwater.org</a>
         </div>
       </footer>
     </>

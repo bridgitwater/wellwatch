@@ -7,7 +7,7 @@ function resend() {
   return (client ??= new Resend(process.env.RESEND_API_KEY));
 }
 
-export const FROM = process.env.EMAIL_FROM ?? "WellWatch <wells@bridgitwater.org>";
+export const FROM = process.env.EMAIL_FROM ?? "WellWatch <wellwatch@bridgitwater.org>";
 export const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
 export async function sendEmail(to: string, subject: string, html: string, text: string) {

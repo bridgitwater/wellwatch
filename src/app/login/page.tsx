@@ -32,7 +32,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
         <LoginForm next={next} />
         <p className="mt-8 text-sm text-ink-3">
           Not getting an email? Check spam, or write to{" "}
-          <a className="underline" href="mailto:wells@bridgitwater.org">wells@bridgitwater.org</a>.
+          <a className="underline" href="mailto:wellwatch@bridgitwater.org">wellwatch@bridgitwater.org</a>.
         </p>
       </div>
     </main>

@@ -15,7 +15,7 @@ export default function AppError({ error, reset }: { error: Error & { digest?: s
         <h1 className="text-2xl font-bold">Something went wrong on our side</h1>
         <p className="text-ink-2 mt-2">
           The page couldn&apos;t load just now. Please try again in a moment — if it keeps happening, write to{" "}
-          <a className="underline" href="mailto:wells@bridgitwater.org">wells@bridgitwater.org</a> and we&apos;ll sort it out.
+          <a className="underline" href="mailto:wellwatch@bridgitwater.org">wellwatch@bridgitwater.org</a> and we&apos;ll sort it out.
         </p>
         <div className="mt-6 flex justify-center gap-3">
           <button type="button" onClick={reset} className="rounded-md bg-water text-white px-4 py-2 font-semibold hover:bg-water-deep">

@@ -32,7 +32,7 @@ export default async function MyWellsPage() {
           <p className="text-ink-2">
             If you&apos;ve funded a well with Bridgit and expected to see it here, it may be linked to a different email
             address. Write to{" "}
-            <a className="underline" href="mailto:wells@bridgitwater.org">wells@bridgitwater.org</a> and we&apos;ll sort it out.
+            <a className="underline" href="mailto:wellwatch@bridgitwater.org">wellwatch@bridgitwater.org</a> and we&apos;ll sort it out.
           </p>
         </div>
       ) : (

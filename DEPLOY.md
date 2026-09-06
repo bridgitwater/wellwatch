@@ -11,7 +11,7 @@ Everything runs on free tiers. Do these once, in order.
    - Redirect URLs: `https://wellwatch.bridgitwater.org/auth/callback`, `https://wellwatch.bridgitwater.org/auth/complete`, `http://localhost:3000/auth/callback`, `http://localhost:3000/auth/complete`
 4. **Authentication → Emails → Magic link or OTP** — subject `Your WellWatch sign-in link`; paste the body from `supabase/email-templates/magic-link.html` (uses `{{ .ConfirmationURL }}`).
 5. **Authentication → SMTP Settings** (so magic links come from bridgitwater.org, not Supabase's shared sender): enable custom SMTP with Resend —
-   host `smtp.resend.com`, port `465`, user `resend`, password = your Resend API key, sender `wells@bridgitwater.org`, name `WellWatch`.
+   host `smtp.resend.com`, port `465`, user `resend`, password = your Resend API key, sender `wellwatch@bridgitwater.org`, name `WellWatch`.
 6. **Authentication → Providers → Email**: keep "Confirm email" on; **turn off** "Allow new users to sign up" — only admins create funders.
 7. **Project Settings → API**: copy Project URL, `anon` key, `service_role` key.
 8. Make yourself admin. After you've signed in once via the portal (or been created by the seed), run in the SQL editor:
@@ -49,7 +49,7 @@ Folder naming: `UG-2026-014 · Kyabirwa` — the code at the start is what the s
    | `GOOGLE_SERVICE_ACCOUNT_JSON_B64` | step 2.5 |
    | `DRIVE_SHARED_DRIVE_ID` | step 2.6 |
    | `RESEND_API_KEY` | step 3 |
-   | `EMAIL_FROM` | `WellWatch <wells@bridgitwater.org>` |
+   | `EMAIL_FROM` | `WellWatch <wellwatch@bridgitwater.org>` |
    | `CRON_SECRET` | any long random string: `openssl rand -hex 32` |
 
 2. Deploy. Then **Settings → Domains** → add `wellwatch.bridgitwater.org` and create the CNAME it asks for at your DNS provider.
