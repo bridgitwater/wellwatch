@@ -1,4 +1,4 @@
--- Fields that mirror BridgIT's Completion & Acquittal Reports, so the funder page
+-- Fields that mirror Bridgit's Completion & Acquittal Reports, so the funder page
 -- can grow into the finished report as the project progresses.
 
 create type public.well_type as enum ('drilled', 'hand_drilled', 'refurbished', 'solar_system', 'piped_scheme', 'other');

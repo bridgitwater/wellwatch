@@ -45,7 +45,7 @@ export function WellArticle({ page, mode, showBack = false }: Props) {
       <header className="grid gap-5 md:grid-cols-[1fr_minmax(0,420px)] md:items-end">
         <div>
           <div className="text-xs font-semibold tracking-[0.12em] uppercase text-water">
-            {well.program_name ?? "BridgIT Water Foundation"}
+            {well.program_name ?? "Bridgit Water Foundation"}
           </div>
           <h1 className="text-4xl sm:text-5xl font-bold mt-2 leading-[1.05]">{well.name}</h1>
           <p className="text-lg text-ink-2 mt-2">
@@ -150,7 +150,7 @@ function ExampleBanner({ plaque, wellName }: { plaque: WellPage["updates"][numbe
     <section aria-labelledby="example-h" className="rounded-xl border border-line bg-surface p-5">
       <h2 id="example-h" className="text-lg font-bold">A finished well, start to end</h2>
       <p className="prose-body text-ink-2 mt-2">
-        This is what every BridgIT funder sees for their own well: the progress, the photos from the field, the people it
+        This is what every Bridgit funder sees for their own well: the progress, the photos from the field, the people it
         serves and the completion report — all in one place, updated as the work happens.
       </p>
       {plaque && (

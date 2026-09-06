@@ -22,7 +22,7 @@ export async function GET(_req: Request, ctx: RouteContext<"/wells/[code]/certif
   return new NextResponse(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="BridgIT-${page.well.code}-certificate.pdf"`,
+      "Content-Disposition": `inline; filename="Bridgit-${page.well.code}-certificate.pdf"`,
       "Cache-Control": "private, no-store",
     },
   });

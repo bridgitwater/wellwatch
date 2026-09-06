@@ -8,7 +8,7 @@ delete from auth.users;
 
 -- Organizations -------------------------------------------------------------
 insert into public.organizations (id, name, country, type) values
-  ('00000000-0000-0000-0000-000000000001', 'BridgIT Water Foundation', 'AU', 'owner'),
+  ('00000000-0000-0000-0000-000000000001', 'Bridgit Water Foundation', 'AU', 'owner'),
   ('00000000-0000-0000-0000-000000000002', 'Busoga Trust Drilling', 'UG', 'partner'),
   ('00000000-0000-0000-0000-000000000003', 'Salima Community Water Works', 'MW', 'partner');
 

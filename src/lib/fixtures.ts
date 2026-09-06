@@ -118,7 +118,7 @@ const kyabirwa: WellPage = {
     id: "30000000-0000-0000-0000-000000000001",
     name: "Suubi Community Projects Uganda",
     country: "UG",
-    intro: "A registered community-based organisation working on a self-help model. Over twelve years Suubi has built or repaired more than 500 boreholes with BridgIT.",
+    intro: "A registered community-based organisation working on a self-help model. Over twelve years Suubi has built or repaired more than 500 boreholes with Bridgit.",
     contact_name: "Steven Beingana",
     contact_title: "Director",
     website: null,

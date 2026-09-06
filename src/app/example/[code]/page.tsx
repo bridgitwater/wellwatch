@@ -11,13 +11,13 @@ export async function generateMetadata({ params }: PageProps<"/example/[code]">)
   const page = await getShowcaseWell(code);
   if (!page) return { title: "Example well" };
   const { well } = page;
-  const title = `${well.name}, ${countryName(well.country)} — a finished BridgIT well`;
+  const title = `${well.name}, ${countryName(well.country)} — a finished Bridgit well`;
   const description = `${WELL_TYPE_LABEL[well.well_type]} serving ${well.people_served ?? "the"} people${well.households ? ` in ${well.households} households` : ""}. See the progress, photos and people behind it.`;
   return {
     title,
     description,
     robots: { index: true, follow: true },
-    openGraph: { title, description, type: "article", siteName: "WellWatch by BridgIT Water" },
+    openGraph: { title, description, type: "article", siteName: "WellWatch by Bridgit Water" },
     twitter: { card: "summary_large_image", title, description },
   };
 }

@@ -9,7 +9,7 @@ export function Shell({ profile, children }: { profile: Profile | null; children
         <div className="mx-auto max-w-5xl px-5 h-14 flex items-center justify-between gap-4">
           <Link href="/wells" className="flex items-baseline gap-2 no-underline">
             <span className="display font-bold text-lg text-ink">WellWatch</span>
-            <span className="text-xs text-ink-3 hidden sm:inline">by BridgIT Water</span>
+            <span className="text-xs text-ink-3 hidden sm:inline">by Bridgit Water</span>
           </Link>
           <nav className="flex items-center gap-4 text-sm">
             {profile?.role === "admin" && (
@@ -36,7 +36,7 @@ export function Shell({ profile, children }: { profile: Profile | null; children
       <main className="flex-1">{children}</main>
       <footer className="border-t border-line mt-16">
         <div className="mx-auto max-w-5xl px-5 py-6 text-xs text-ink-3 flex flex-wrap gap-x-4 gap-y-1">
-          <span>BridgIT Water Foundation · Australian Charity CH1853</span>
+          <span>Bridgit Water Foundation · Australian Charity CH1853</span>
           <a className="hover:text-ink-2" href="https://bridgitwater.org">bridgitwater.org</a>
           <a className="hover:text-ink-2" href="mailto:wells@bridgitwater.org">wells@bridgitwater.org</a>
         </div>

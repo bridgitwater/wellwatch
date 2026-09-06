@@ -1,6 +1,6 @@
 # WellWatch
 
-BridgIT Water's funder portal. Each funder signs in with an emailed link and sees the well(s) they funded: progress through the six stages, photos and video from the field, the community, and what their gift paid for.
+Bridgit Water's funder portal. Each funder signs in with an emailed link and sees the well(s) they funded: progress through the six stages, photos and video from the field, the community, and what their gift paid for.
 
 Photos and videos live in a Google **Shared Drive** called `Wells`, one folder per well (`UG-2026-014 · Kyabirwa`). The team drops incoming WhatsApp photos into the folder; a sync job every ten minutes turns new files into updates on the funder's page. Drive is the master copy — nothing is copied out.
 

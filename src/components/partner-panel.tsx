@@ -28,7 +28,7 @@ export function PartnerPanel({ partner }: { partner: Partner | null }) {
           )}
         </div>
       )}
-      <p className="text-xs text-ink-3 mt-3">Managed by BridgIT Water Foundation, Australia.</p>
+      <p className="text-xs text-ink-3 mt-3">Managed by Bridgit Water Foundation, Australia.</p>
     </section>
   );
 }

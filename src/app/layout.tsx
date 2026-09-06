@@ -16,7 +16,7 @@ const body = Figtree({
 
 export const metadata: Metadata = {
   title: { default: "WellWatch", template: "%s · WellWatch" },
-  description: "Follow the progress of the water well you funded with BridgIT.",
+  description: "Follow the progress of the water well you funded with Bridgit.",
 };
 
 export const viewport: Viewport = {

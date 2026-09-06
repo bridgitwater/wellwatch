@@ -30,7 +30,7 @@ export default async function MyWellsPage() {
       {wells.length === 0 ? (
         <div className="rounded-xl border border-line bg-surface p-6 max-w-lg">
           <p className="text-ink-2">
-            If you&apos;ve funded a well with BridgIT and expected to see it here, it may be linked to a different email
+            If you&apos;ve funded a well with Bridgit and expected to see it here, it may be linked to a different email
             address. Write to{" "}
             <a className="underline" href="mailto:wells@bridgitwater.org">wells@bridgitwater.org</a> and we&apos;ll sort it out.
           </p>

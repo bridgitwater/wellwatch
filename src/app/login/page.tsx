@@ -15,10 +15,10 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
       <HashRescue next={next} />
       <div className="w-full max-w-sm">
         <div className="mb-8">
-          <div className="text-xs font-semibold tracking-[0.12em] uppercase text-water">BridgIT Water</div>
+          <div className="text-xs font-semibold tracking-[0.12em] uppercase text-water">Bridgit Water</div>
           <h1 className="text-3xl font-bold mt-1">Follow your well</h1>
           <p className="text-ink-2 mt-2">
-            WellWatch is where BridgIT funders see the progress, photos and people behind the well they gave.
+            WellWatch is where Bridgit funders see the progress, photos and people behind the well they gave.
             Enter the email you used when you funded it and we&apos;ll send a sign-in link — no password needed.
           </p>
         </div>

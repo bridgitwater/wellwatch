@@ -18,7 +18,7 @@ export function PartnerForm({ org }: { org: Partner }) {
         <Field label="Contact title"><Input name="contact_title" defaultValue={org.contact_title ?? ""} placeholder="Director" /></Field>
         <Field label="Website"><Input name="website" defaultValue={org.website ?? ""} placeholder="suubi.org" /></Field>
         <Field label="Logo (Drive link or id)"><Input name="logo_file_id" defaultValue={org.logo_file_id ?? ""} /></Field>
-        <Field label="Introduction for funders" className="sm:col-span-2" hint="Two or three sentences: who they are, how long they've worked with BridgIT, what you've built together.">
+        <Field label="Introduction for funders" className="sm:col-span-2" hint="Two or three sentences: who they are, how long they've worked with Bridgit, what you've built together.">
           <Textarea name="intro" defaultValue={org.intro ?? ""} />
         </Field>
         <div className="sm:col-span-2 flex items-center gap-3">

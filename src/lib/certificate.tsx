@@ -29,10 +29,10 @@ export function Certificate({ well, stages, funderName, cofunders }: Certificate
   const handover = stages.find((x) => x.stage === "handover")?.reached_at;
   const others = Math.max(cofunders - 1, 0);
   return (
-    <Document title={`WellWatch certificate · ${well.code}`} author="BridgIT Water Foundation">
+    <Document title={`WellWatch certificate · ${well.code}`} author="Bridgit Water Foundation">
       <Page size="A4" style={s.page}>
         <View style={s.rule} />
-        <Text style={s.eyebrow}>BridgIT Water Foundation · Certificate of completion</Text>
+        <Text style={s.eyebrow}>Bridgit Water Foundation · Certificate of completion</Text>
         <Text style={s.title}>Clean water for {well.name}</Text>
         <Text style={s.sub}>
           {[well.village, well.region, countryName(well.country)].filter(Boolean).join(", ")} · Well {well.code}
@@ -61,7 +61,7 @@ export function Certificate({ well, stages, funderName, cofunders }: Certificate
         </View>
 
         <View style={s.footer}>
-          <Text>BridgIT Water Foundation · Australian Charity CH1853 · bridgitwater.org</Text>
+          <Text>Bridgit Water Foundation · Australian Charity CH1853 · bridgitwater.org</Text>
           <Text>Completed {handover ? fmtDate(handover) : well.completed_at ? fmtDate(well.completed_at) : fmtDate(new Date())}</Text>
         </View>
       </Page>
