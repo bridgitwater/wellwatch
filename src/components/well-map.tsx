@@ -17,7 +17,7 @@ export function WellMap({ lat, lng, label }: { lat: number; lng: number; label: 
         container: ref.current,
         style: "https://tiles.openfreemap.org/styles/liberty",
         center: [lng, lat],
-        zoom: 9,
+        zoom: 3, // continent view: shows which part of the world the well is in; visitors can zoom in
         attributionControl: { compact: true },
         cooperativeGestures: true,
       });
@@ -34,5 +34,5 @@ export function WellMap({ lat, lng, label }: { lat: number; lng: number; label: 
     };
   }, [lat, lng, label]);
 
-  return <div ref={ref} className="h-64 w-full rounded-lg overflow-hidden bg-aquifer" role="img" aria-label={`Map showing ${label}`} />;
+  return <div ref={ref} className="h-64 w-full rounded-lg overflow-hidden bg-aquifer" role="region" aria-label={`Map showing ${label}`} />;
 }
