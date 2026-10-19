@@ -85,7 +85,17 @@ Scale: medium — 50 to 500 funders and wells. Budget: free tiers wherever possi
 
 ---
 
-## 6. Status (6 Sep 2026)
+## 6. Status
+
+### 19 Oct 2026 (health check + Wave 1)
+Full health check and fix plan: Claude Docs "WellWatch health check and fix plan"; partner/Carla guide: "WellWatch onboarding guide". Sync and notify crons verified (1,008/1,008 and 168/168 runs OK over 7 days); magic link delivers to inbox in under a minute.
+- Fixed: admin Partners page was empty since migration 000300 (`wells(count)` refused for authenticated) — now `wells(id)`; piped-scheme stage names; functions pinned to `syd1` via `vercel.json`.
+- Data: partners SPREAWS, SRHED, KEEP added. Pilot wells loaded (no funders invited yet): IN-2026-001 Vaddipalli (SRHED), IN-2026-002 Koonavaripalli (SPREAWS), UG-2026-001 Wabwoko HCIII (Suubi, in progress), NP-2026-001 Takare (KEEP). Codes are CC-YYYY-NNN in load order. Ngoleka example anonymised ("an Australian family").
+- Email: wells@bridgitwater.org does not exist (bounces). wellwatch@ accepts mail but nobody receives it — route it to info@ in Google Admin.
+- Carla's admin login will be info@bridgitwater.org (Dusty to create + promote).
+- Open (Wave 2): welcome/invite email, same-day updates marked notified without sending, hidden media still reachable via link-shared folders, unsubscribe link, admin action errors, WhatsApp filename dates.
+
+### 6 Sep 2026
 
 Done and live: everything above, including Phase 0 of the roadmap (sync reliability, privacy lockdown, open-redirect fix, cron migration, EXIF/timezone, editable update dates, admin sees all wells), the review's quick wins (error/loading pages, CI, contrast, copy, notification reliability, certificate naming), the showcase feature, branding, the domain move and the redesigned sign-in email. Test well UG-2026-014 has been deleted. Only Ngoleka exists in the live database.
 
