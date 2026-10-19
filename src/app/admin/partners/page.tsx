@@ -11,9 +11,11 @@ export default async function Partners() {
   const supabase = await createClient();
   const { data } = await supabase
     .from("organizations")
-    .select("id, name, country, type, intro, contact_name, contact_title, website, logo_file_id, wells(count)")
+    .select("id, name, country, type, intro, contact_name, contact_title, website, logo_file_id, wells(id)")
     .order("name");
-  type Row = Partner & { type: string; wells: { count: number }[] };
+  // wells(id), not wells(count): funders' column-level grants on wells (migration 000300)
+  // make PostgREST refuse a count aggregate, which emptied this whole list.
+  type Row = Partner & { type: string; wells: { id: string }[] };
   const rows = (data ?? []) as unknown as Row[];
 
   return (
@@ -30,7 +32,7 @@ export default async function Partners() {
                   </div>
                   {o.intro && <p className="text-sm text-ink-2 mt-1 line-clamp-2">{o.intro}</p>}
                 </div>
-                <div className="text-sm tnum text-ink-2 shrink-0">{o.wells[0]?.count ?? 0} wells</div>
+                <div className="text-sm tnum text-ink-2 shrink-0">{o.wells.length} wells</div>
               </div>
               {o.type === "partner" && <div className="mt-2"><PartnerForm org={o} /></div>}
             </li>
