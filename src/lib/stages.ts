@@ -58,7 +58,11 @@ export function stageLabel(stage: WellStage, type: WellType = "drilled"): string
   if (type === "refurbished") {
     return ({ drilling: "Repair works", pump_apron: "New pump & platform", survey: "Assessment" } as Partial<Record<WellStage, string>>)[stage] ?? STAGE_LABEL[stage];
   }
-  if (type === "solar_system" || type === "piped_scheme") {
+  if (type === "piped_scheme") {
+    // Gravity-fed schemes (e.g. KEEP Nepal): nothing is drilled.
+    return ({ survey: "Survey & design", drilling: "Intake & pipeline", pump_apron: "Tank & taps" } as Partial<Record<WellStage, string>>)[stage] ?? STAGE_LABEL[stage];
+  }
+  if (type === "solar_system") {
     return ({ pump_apron: "Pump, tank & taps" } as Partial<Record<WellStage, string>>)[stage] ?? STAGE_LABEL[stage];
   }
   if (type === "hand_drilled") {
@@ -78,6 +82,14 @@ export function stageBlurb(stage: WellStage, type: WellType = "drilled"): string
   if (type === "hand_drilled") {
     return ({
       drilling: "A crew of five to seven drills by hand to about 40 metres, then cases and gravel-packs the hole.",
+    } as Partial<Record<WellStage, string>>)[stage] ?? STAGE_BLURB[stage];
+  }
+  if (type === "piped_scheme") {
+    return ({
+      survey: "Our partner and the community agree the water source, the pipe route and where the taps go.",
+      drilling: "The intake is built at the source and the pipeline is laid to the village, much of it by community labour.",
+      pump_apron: "Storage tanks and tap stands are built so every household has water close by.",
+      water_flowing: "Water reaches the village taps. The flow and water quality are checked.",
     } as Partial<Record<WellStage, string>>)[stage] ?? STAGE_BLURB[stage];
   }
   if (type === "solar_system") {
