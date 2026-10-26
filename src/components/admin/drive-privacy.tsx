@@ -21,29 +21,29 @@ export async function DrivePrivacyCard() {
   const byId = new Map((rows.data ?? []).map((r) => [r.file_id, r]));
   const desired = (d.data ?? []) as { file_id: string }[];
   const verified = desired.filter((x) => byId.get(x.file_id)?.direct).length;
-  const failing = desired.filter((x) => byId.get(x.file_id)?.last_error && !byId.get(x.file_id)?.direct).length;
+  // Files whose folder is private but which still lack a confirmed link of their own.
+  const failing = desired.filter((x) => !byId.get(x.file_id)?.direct && byId.get(x.file_id)?.last_error && byId.get(x.file_id)?.last_error !== "Drive didn't confirm the file's own link").length;
   const folders = new Set((wells.data ?? []).map((w) => w.drive_folder_id as string));
   const privateFolders = [...folders].filter((f) => byId.get(f)?.kind === "folder" && byId.get(f)?.shared === false).length;
-  const ready = desired.length > 0 && verified === desired.length;
   const done = folders.size > 0 && privateFolders === folders.size;
 
   return (
     <Card title="Drive privacy">
       <dl className="text-sm flex flex-col gap-1">
-        <div className="flex justify-between"><dt className="text-ink-2">Files funders see, shared on their own</dt><dd className="tnum font-semibold">{verified} / {desired.length}</dd></div>
         <div className="flex justify-between"><dt className="text-ink-2">Well folders private</dt><dd className="tnum font-semibold">{privateFolders} / {folders.size}</dd></div>
+        <div className="flex justify-between"><dt className="text-ink-2">Files funders see, with their own link</dt><dd className="tnum font-semibold">{verified} / {desired.length}</dd></div>
       </dl>
-      {failing > 0 && <p className="text-xs text-clay mt-2">{failing} file{failing === 1 ? "" : "s"} couldn&apos;t be shared yet; WellWatch retries every 10 minutes.</p>}
+      {failing > 0 && privateFolders > 0 && <p className="text-xs text-clay mt-2">{failing} file{failing === 1 ? "" : "s"} still need their own link; WellWatch retries every 10 minutes.</p>}
       {done ? (
         <p className="text-xs text-ok mt-3">Done. Folders are private: only the photos, videos and reports funders can see have links, and hiding one removes its link.</p>
       ) : (
         <>
           <p className="text-xs text-ink-3 mt-3">
-            {ready
-              ? "Every file funders can see has its own link, so the folders can now be made private. Hidden photos will then be unreachable from Drive."
-              : "Files are being shared one by one by the 10-minute sync. Once they all are, make the folders private. Until then, anyone with a folder's link can browse it."}
+            Until folders are private, anyone with a folder&apos;s link can browse it, hidden photos included. Making a folder private
+            gives each photo, video and report funders see its own link, and puts the folder&apos;s link back if anything doesn&apos;t work.
+            Try one folder first and check its well page.
           </p>
-          <DrivePrivacyButtons ready={ready} />
+          <DrivePrivacyButtons ready={privateFolders > 0} />
         </>
       )}
     </Card>

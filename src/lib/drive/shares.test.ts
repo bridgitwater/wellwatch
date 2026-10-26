@@ -30,14 +30,20 @@ function fakeDb(desired: ReturnType<typeof want>[], rows: Partial<Row>[] = [], m
 }
 
 /**
- * A model of Drive sharing: each item may have its own "anyone" link; a folder's link is
- * inherited by everything inside it. `stubborn` files ignore share() (to check we verify).
+ * A model of Drive sharing, matching what production showed: a file can't get a link of
+ * its own while its folder shares the same link (share() is a silent no-op then).
+ * `stubborn` files never take a link. `parents` maps file -> folder.
  */
-function fakeDrive(own: string[] = [], stubborn: string[] = []): DriveOps & { own: Set<string>; log: string[] } {
+function fakeDrive(own: string[] = [], stubborn: string[] = [], parents: Record<string, string> = {}): DriveOps & { own: Set<string>; log: string[] } {
   const ownSet = new Set(own); const log: string[] = [];
   return {
     own: ownSet, log,
-    async share(id) { log.push(`share ${id}`); if (!stubborn.includes(id)) ownSet.add(id); },
+    async share(id) {
+      log.push(`share ${id}`);
+      if (stubborn.includes(id)) return;
+      if (parents[id] && ownSet.has(parents[id])) return; // inherited link already there: Drive adds nothing
+      ownSet.add(id);
+    },
     async directLink(id) { return ownSet.has(id); },
     async unshare(id) { log.push(`unshare ${id}`); ownSet.delete(id); },
   };
@@ -47,29 +53,36 @@ const run = (db: unknown, files: DriveFile[], ops: DriveOps, deadline?: number) 
   // @ts-expect-error fake client
   reconcileShares(db, files, ROOT, ops, deadline);
 
-describe("phase 1: sharing files on their own (every sync)", () => {
-  it("shares each visible file, confirms Drive gave it its own link, and leaves folders alone", async () => {
-    const db = fakeDb([want("a"), want("b")]);
-    const drive = fakeDrive(["F1"]);
-    const r = await run(db, [folder("F1"), file("a", "F1"), file("b", "F1")], drive);
-    expect(r).toMatchObject({ shared: 2, verified: 2, wanted: 2, errors: [] });
-    expect(drive.own.has("F1")).toBe(true);
+const PRIVATE_F1 = { file_id: "F1", kind: "folder", shared: false, direct: false };
+
+describe("every sync", () => {
+  it("leaves files in folders that are still shared alone (the folder's link covers them)", async () => {
+    const db = fakeDb([want("a")]);
+    const drive = fakeDrive(["F1"], [], { a: "F1" });
+    const r = await run(db, [folder("F1"), file("a", "F1")], drive);
+    expect(drive.log).toEqual([]);
+    expect(r.errors).toEqual([]);
+  });
+
+  it("gives new files in a private folder their own link, confirmed", async () => {
+    const db = fakeDb([want("a")], [PRIVATE_F1]);
+    const drive = fakeDrive([], [], { a: "F1" });
+    const r = await run(db, [folder("F1", false), file("a", "F1")], drive);
+    expect(r).toMatchObject({ shared: 1, verified: 1, errors: [] });
     expect(db.table.get("a")).toMatchObject({ shared: true, direct: true });
   });
 
   it("doesn't trust a share Drive won't confirm: records it unconfirmed and retries next run", async () => {
-    const db = fakeDb([want("a")]);
-    const drive = fakeDrive([], ["a"]);
-    const r = await run(db, [folder("F1"), file("a", "F1")], drive);
+    const db = fakeDb([want("a")], [PRIVATE_F1]);
+    const r = await run(db, [folder("F1", false), file("a", "F1")], fakeDrive([], ["a"]));
     expect(r.verified).toBe(0);
     expect(r.errors.join()).toMatch(/didn't confirm/);
-    expect(db.table.get("a")).toMatchObject({ direct: false });
   });
 
   it("re-shares a file whose own link was removed outside WellWatch (Drive is the source of truth)", async () => {
-    const db = fakeDb([want("a")], [{ file_id: "a" }]);
+    const db = fakeDb([want("a")], [PRIVATE_F1, { file_id: "a" }]);
     const drive = fakeDrive([]);
-    await run(db, [folder("F1"), file("a", "F1", false)], drive);
+    await run(db, [folder("F1", false), file("a", "F1", false)], drive);
     expect(drive.own.has("a")).toBe(true);
   });
 
@@ -81,7 +94,7 @@ describe("phase 1: sharing files on their own (every sync)", () => {
     expect(drive.own.has("h")).toBe(false);
   });
 
-  it("never touches well folders in phase 1", async () => {
+  it("never makes well folders private on its own", async () => {
     const db = fakeDb([]);
     const drive = fakeDrive(["F1"]);
     await run(db, [folder("F1", true)], drive);
@@ -95,19 +108,8 @@ describe("phase 1: sharing files on their own (every sync)", () => {
     expect(drive.log).not.toContain("share x");
   });
 
-  it("does the most urgent work first: files in folders that are already private", async () => {
-    const db = fakeDb([want("old", "F1"), want("new", "F2")], [{ file_id: "F2", kind: "folder", shared: false, direct: false }]);
-    const drive = fakeDrive();
-    const r = await run(db, [folder("F1"), folder("F2", false), file("old", "F1"), file("new", "F2")], drive, Date.now() - 1);
-    expect(r.more).toBe(true);
-    expect(drive.log).toEqual([]);
-    const r2 = await run(fakeDb([want("old", "F1"), want("new", "F2")], [{ file_id: "F2", kind: "folder", shared: false, direct: false }]), [folder("F1"), folder("F2", false), file("old", "F1"), file("new", "F2")], drive);
-    expect(r2.shared).toBe(2);
-    expect(drive.log[0]).toBe("share new");
-  });
-
   it("takes the link off a private folder that someone shared again by hand, and says so", async () => {
-    const db = fakeDb([], [{ file_id: "F1", kind: "folder", shared: false, direct: false }]);
+    const db = fakeDb([], [PRIVATE_F1]);
     const drive = fakeDrive(["F1"]);
     const r = await run(db, [folder("F1", true)], drive);
     expect(drive.own.has("F1")).toBe(false);
@@ -115,62 +117,65 @@ describe("phase 1: sharing files on their own (every sync)", () => {
   });
 });
 
-describe("phase 2: making folders private (admin button)", () => {
+describe("making folders private (admin button)", () => {
   // @ts-expect-error fake client
-  const priv = (db: unknown, files: DriveFile[], ops: DriveOps) => makeFoldersPrivate(db, files, ROOT, ops);
+  const priv = (db: unknown, files: DriveFile[], ops: DriveOps, max?: number) => makeFoldersPrivate(db, files, ROOT, ops, undefined, max, 0);
 
-  it("waits while any of a folder's visible files lacks its own link", async () => {
+  it("removes the folder's link, then gives each visible file its own, confirmed, and records it", async () => {
     const db = fakeDb([want("a"), want("b")]);
-    const drive = fakeDrive(["F1", "a"]);
+    const drive = fakeDrive(["F1"], [], { a: "F1", b: "F1" });
     const r = await priv(db, [folder("F1"), file("a", "F1"), file("b", "F1")], drive);
-    expect(r.madePrivate).toEqual([]);
-    expect(r.skipped.join()).toMatch(/1 file/);
-    expect(drive.own.has("F1")).toBe(true);
+    expect(r).toMatchObject({ madePrivate: ["F1"], errors: [] });
+    expect(drive.log[0]).toBe("unshare F1");
+    expect([...drive.own].sort()).toEqual(["a", "b"]);
+    expect(db.table.get("F1")).toMatchObject({ kind: "folder", shared: false });
+    expect(db.table.get("a")).toMatchObject({ direct: true });
   });
 
-  it("makes a ready folder private, keeps its files viewable, and records it", async () => {
+  it("puts the folder's link back if any file can't get its own (nothing breaks for funders)", async () => {
+    const db = fakeDb([want("a"), want("b")]);
+    const drive = fakeDrive(["F1"], ["b"], { a: "F1", b: "F1" });
+    const r = await priv(db, [folder("F1"), file("a", "F1"), file("b", "F1")], drive);
+    expect(r.madePrivate).toEqual([]);
+    expect(drive.own.has("F1")).toBe(true);
+    expect(r.errors.join()).toMatch(/folder's link was put back/);
+    expect(db.table.get("F1")).toBeUndefined();
+  });
+
+  it("retries a file once when Drive is slow to drop the folder's link", async () => {
     const db = fakeDb([want("a")]);
-    const drive = fakeDrive(["F1", "a"]);
-    const r = await priv(db, [folder("F1"), file("a", "F1")], drive);
+    let tries = 0;
+    const drive = fakeDrive(["F1"], [], { a: "F1" });
+    const slow: DriveOps = { ...drive, async share(id) { if (id === "a" && ++tries === 1) return; await drive.share(id); } };
+    const r = await priv(db, [folder("F1"), file("a", "F1")], slow);
     expect(r.madePrivate).toEqual(["F1"]);
-    expect(drive.own.has("F1")).toBe(false);
-    expect(drive.own.has("a")).toBe(true);
-    expect(db.table.get("F1")).toMatchObject({ kind: "folder", shared: false });
+    expect(r.errors).toEqual([]);
+    expect(tries).toBe(2);
   });
 
   it("'Try one folder first' stops after one", async () => {
     const db = fakeDb([]);
     const drive = fakeDrive(["F1", "F2"]);
-    // @ts-expect-error fake client
-    const r = await makeFoldersPrivate(db, [folder("F1"), folder("F2")], ROOT, drive, undefined, 1);
+    const r = await priv(db, [folder("F1"), folder("F2")], drive, 1);
     expect(r.madePrivate).toHaveLength(1);
     expect(drive.own.size).toBe(1);
   });
 
-  it("puts the folder's link back if a file would break and can't be re-shared", async () => {
-    const db = fakeDb([want("a")]);
-    // A Drive where the file's link only came from the folder, and sharing the file doesn't stick.
-    let folderShared = true; const log: string[] = [];
-    const ops: DriveOps = {
-      async share(id) { log.push(`share ${id}`); if (id === "F1") folderShared = true; },
-      async directLink(id) { return id === "a" ? folderShared : false; },
-      async unshare(id) { log.push(`unshare ${id}`); if (id === "F1") folderShared = false; },
-    };
-    // @ts-expect-error fake client
-    const r = await makeFoldersPrivate(db, [folder("F1"), file("a", "F1")], ROOT, ops);
-    expect(r.madePrivate).toEqual([]);
-    expect(folderShared).toBe(true);
-    expect(r.errors.join()).toMatch(/shared again\. Nothing changed for funders/);
-    expect(db.table.get("F1")).toBeUndefined();
-  });
-
   it("finds files by where they really are, including subfolders", async () => {
     const db = fakeDb([want("deep", "WRONG")]);
-    const drive = fakeDrive(["F1"]);
+    const drive = fakeDrive(["F1"], [], { deep: "S1" });
     const sub: DriveFile = { ...folder("S1"), parents: ["F1"] };
     const r = await priv(db, [folder("F1"), sub, file("deep", "S1")], drive);
+    expect(r.madePrivate).toEqual(["F1"]);
+    expect(drive.own.has("deep")).toBe(true);
+  });
+
+  it("skips folders already private", async () => {
+    const db = fakeDb([], [PRIVATE_F1]);
+    const drive = fakeDrive([]);
+    const r = await priv(db, [folder("F1", false)], drive);
     expect(r.madePrivate).toEqual([]);
-    expect(r.skipped.join()).toMatch(/F1/);
+    expect(drive.log).toEqual([]);
   });
 });
 
@@ -184,8 +189,22 @@ describe("hide/show straight away", () => {
     expect(note).toMatch(/still shared by link/);
   });
   it("says nothing once the folder is private", async () => {
-    const db = fakeDb([], [{ file_id: "h" }, { file_id: "F1", kind: "folder", shared: false, direct: false }], { h: "F1" });
+    const db = fakeDb([], [{ file_id: "h" }, PRIVATE_F1], { h: "F1" });
     // @ts-expect-error fake client
     expect(await applyShares(db, ["h"], fakeDrive(["h"]))).toBeNull();
+  });
+  it("showing a photo in a still-shared folder needs no Drive change", async () => {
+    const db = fakeDb([want("a")]);
+    const drive = fakeDrive(["F1"], [], { a: "F1" });
+    // @ts-expect-error fake client
+    expect(await applyShares(db, ["a"], drive)).toBeNull();
+    expect(drive.log).toEqual([]);
+  });
+  it("showing a photo in a private folder gives it its own link", async () => {
+    const db = fakeDb([want("a")], [PRIVATE_F1]);
+    const drive = fakeDrive([], [], { a: "F1" });
+    // @ts-expect-error fake client
+    expect(await applyShares(db, ["a"], drive)).toBeNull();
+    expect(drive.own.has("a")).toBe(true);
   });
 });

@@ -3,16 +3,19 @@ import { errorMessage, type createAdminClient } from "../supabase/admin";
 import { FOLDER_MIME, getDrive, type DriveFile } from "./client";
 
 /**
- * Private Drive folders, in two phases.
+ * Private Drive folders.
  *
- * 1. Every Drive sync (and straight after an admin hides or shows something), each file
- *    funders may see gets a link of its own ("anyone with the link", reader), and Drive is
- *    asked to confirm it is the file's own permission, not one inherited from its folder.
- *    Files that shouldn't be viewable (hidden, or not used) lose their own link.
- * 2. An admin presses "Make folders private" on the dashboard. A folder only goes private
- *    when every file of its that funders may see has a confirmed link of its own; each
- *    file is checked again before and after. From then on the sync re-checks folders and
- *    takes away any link someone adds to a folder by hand.
+ * Drive won't give a file a link of its own while its folder already shares the same link
+ * (found in production, 27 Oct 2026), so it happens folder by folder:
+ *
+ * - An admin presses "Make folders private" (or "Try one folder first") on the dashboard.
+ *   For each well folder: the folder's link is removed, each file funders may see gets its
+ *   own "anyone with the link" (reader) permission and Drive confirms it; if any file can't
+ *   be confirmed, the folder's link is put straight back. A few seconds per folder.
+ * - Every Drive sync then keeps it that way: new files in private folders get their own
+ *   link (confirmed), anything hidden or unused loses its own link, and a private folder
+ *   that someone shares again by hand is made private again. Files in folders that are
+ *   still shared are left alone: their folder's link already covers them.
  *
  * Drive is the source of truth: the listing's hasAugmentedPermissions says which items
  * have permissions of their own, so files shared outside WellWatch are caught too.
@@ -147,21 +150,22 @@ export async function reconcileShares(db: Db, files: DriveFile[], rootId: string
   const { desired } = loaded;
   const wanted = new Set(desired.map((d) => d.file_id));
   const byId = new Map(files.map((f) => [f.id, f]));
-  const privateFolder = (id: string | null) => !!id && ctx.rows.get(id)?.kind === "folder" && ctx.rows.get(id)?.shared === false;
+  const privateFolder = (id: string | null | undefined) => !!id && ctx.rows.get(id)?.kind === "folder" && ctx.rows.get(id)?.shared === false;
+  const topOf = topFolderOf(files, rootId);
 
-  // Share: files with no confirmed link of their own. Drive's own flag catches links that
-  // were removed outside WellWatch; files in private folders go first (they're broken now).
-  const todo = desired
-    .filter((d) => {
-      const row = ctx.rows.get(d.file_id);
-      const inDrive = byId.get(d.file_id);
-      if (!inDrive) {
-        // Not in the Wells drive (e.g. a report kept in someone's My Drive): try once a day, never block anything.
-        return !(row && !row.direct && Date.now() - Date.parse(row.updated_at) < DAY) && !(row?.direct);
-      }
-      return !row?.direct || inDrive.augmented === false;
-    })
-    .sort((a, b) => Number(privateFolder(b.folder_id)) - Number(privateFolder(a.folder_id)));
+  // Share: files in private folders without a confirmed link of their own (Drive's own flag
+  // catches links removed outside WellWatch). Files in folders still shared are covered by
+  // the folder's link and Drive won't give them their own, so they wait for that folder.
+  const todo = desired.filter((d) => {
+    const row = ctx.rows.get(d.file_id);
+    const inDrive = byId.get(d.file_id);
+    if (!inDrive) {
+      // Not in the Wells drive (e.g. a report kept in someone's My Drive): try once a day.
+      return !row?.direct && !(row && Date.now() - Date.parse(row.updated_at) < DAY);
+    }
+    if (!privateFolder(topOf(d.file_id))) return false;
+    return !row?.direct || inDrive.augmented === false;
+  });
   for (const f of todo) {
     if (Date.now() > ctx.deadline) { result.more = true; break; }
     await shareVerified(ctx, f, byId.has(f.file_id) ? f.kind : "other");
@@ -202,6 +206,21 @@ export async function reconcileShares(db: Db, files: DriveFile[], rootId: string
   return result;
 }
 
+/** Maps a Drive item to the top-level (well) folder it sits in, from the sync's listing. */
+function topFolderOf(files: DriveFile[], rootId: string) {
+  const byId = new Map(files.map((f) => [f.id, f]));
+  const parentOf = new Map(files.filter((f) => f.mimeType === FOLDER_MIME).map((f) => [f.id, f.parents[0]]));
+  return (id: string): string | null => {
+    let cur = byId.get(id)?.parents[0];
+    for (let i = 0; cur && i < 20; i++) {
+      const p = parentOf.get(cur);
+      if (!p || p === rootId) return cur;
+      cur = p;
+    }
+    return cur ?? null;
+  };
+}
+
 /**
  * After an admin hides or shows something: share or unshare just those files now.
  * Returns a note for the admin when the change isn't fully effective yet.
@@ -213,10 +232,13 @@ export async function applyShares(db: Db, fileIds: string[], ops: DriveOps = dri
   const ctx: Ctx = { db, ops, deadline: Date.now() + 20_000, result, rows: loaded.rows };
   const want = new Map(loaded.desired.map((d) => [d.file_id, d]));
   let folderStillShared = false;
+  const isPrivate = (folder: string | null) => !!folder && ctx.rows.get(folder)?.kind === "folder" && ctx.rows.get(folder)?.shared === false;
   for (const id of new Set(fileIds)) {
     const d = want.get(id);
-    if (d) await shareVerified(ctx, d, d.kind);
-    else {
+    if (d) {
+      // In a folder still shared by link, the folder already makes it viewable.
+      if (isPrivate(d.folder_id) || d.kind === "logo") await shareVerified(ctx, d, d.kind);
+    } else {
       await unshareOne(ctx, id, ctx.rows.get(id)?.kind ?? "media");
       const { data } = await db.from("media").select("wells(drive_folder_id)").eq("drive_file_id", id).maybeSingle();
       const folder = (data as unknown as { wells: { drive_folder_id: string | null } | null } | null)?.wells?.drive_folder_id;
@@ -231,24 +253,16 @@ export async function applyShares(db: Db, fileIds: string[], ops: DriveOps = dri
 export type FolderResult = { madePrivate: string[]; skipped: string[]; errors: string[] };
 
 /**
- * Phase 2: make shared well folders private. A folder is only done when every file of
- * its that funders may see has a confirmed link of its own, checked fresh. Afterwards
- * each of those files is checked again; any that lost its link is shared again.
+ * Makes well folders private, one at a time: remove the folder's link, give each file of
+ * it that funders may see its own link and have Drive confirm it, and if any can't be
+ * confirmed, put the folder's link back (nothing changes for funders). Files are found by
+ * where they really are in Drive, subfolders included. `max` stops after that many folders.
  */
-export async function makeFoldersPrivate(db: Db, files: DriveFile[], rootId: string, ops: DriveOps = driveOps, deadline = Date.now() + 150_000, max = Infinity): Promise<FolderResult> {
+export async function makeFoldersPrivate(db: Db, files: DriveFile[], rootId: string, ops: DriveOps = driveOps, deadline = Date.now() + 150_000, max = Infinity, retryDelayMs = 2000): Promise<FolderResult> {
   const out: FolderResult = { madePrivate: [], skipped: [], errors: [] };
   const { desired, rows } = await load(db);
   const byId = new Map(files.map((f) => [f.id, f]));
-  const parentOf = new Map(files.filter((f) => f.mimeType === FOLDER_MIME).map((f) => [f.id, f.parents[0]]));
-  const topOf = (id: string) => {
-    let cur = byId.get(id)?.parents[0];
-    for (let i = 0; cur && i < 20; i++) {
-      const p = parentOf.get(cur);
-      if (!p || p === rootId) return cur;
-      cur = p;
-    }
-    return cur ?? null;
-  };
+  const topOf = topFolderOf(files, rootId);
   const roots = files.filter((f) => f.mimeType === FOLDER_MIME && f.parents.includes(rootId));
   const ctx: Ctx = { db, ops, deadline, result: empty(), rows };
 
@@ -257,29 +271,33 @@ export async function makeFoldersPrivate(db: Db, files: DriveFile[], rootId: str
     if (Date.now() > deadline) { out.skipped.push(`${folder.name}: out of time, press again`); continue; }
     const row = rows.get(folder.id);
     if (row?.kind === "folder" && !row.shared && folder.augmented === false) continue; // already private
-    // Its files funders may see, located by where they really are in Drive.
     const inside = desired.filter((d) => byId.has(d.file_id) && topOf(d.file_id) === folder.id);
     try {
-      const unready: string[] = [];
-      for (const d of inside) if (!(await ops.directLink(d.file_id))) unready.push(d.file_id);
-      if (unready.length) { out.skipped.push(`${folder.name}: ${unready.length} file(s) not yet shared on their own; the next sync will do it`); continue; }
       await ops.unshare(folder.id);
-      const broken: string[] = [];
+      const failed: string[] = [];
       for (const d of inside) {
-        if (await ops.directLink(d.file_id)) continue;
+        const before = ctx.result.errors.length;
         await shareVerified(ctx, d, d.kind);
-        if (!(await ops.directLink(d.file_id))) broken.push(d.file_id);
+        if (ctx.result.errors.length > before) {
+          // Drive can take a moment to drop the folder's link from its files: try once more.
+          await new Promise((r) => setTimeout(r, retryDelayMs));
+          ctx.result.errors.length = before;
+          await shareVerified(ctx, d, d.kind);
+        }
+        if (ctx.result.errors.length > before || !(await ops.directLink(d.file_id))) failed.push(d.file_id);
       }
-      if (broken.length) {
-        // Something funders see would break: put the folder's link back and stop here.
+      if (failed.length) {
+        // Something funders see would break: put the folder's link back and leave it.
         await ops.share(folder.id);
-        out.errors.push(`${folder.name}: ${broken.length} file(s) lost their link when the folder went private, so the folder was shared again. Nothing changed for funders.`);
+        out.errors.push(`${folder.name}: ${failed.length} of ${inside.length} file(s) couldn't get their own link, so the folder's link was put back. Nothing changed for funders.`);
         continue;
       }
       await record(ctx, folder.id, "folder", false, false, null);
       out.madePrivate.push(folder.name);
     } catch (e) {
-      out.errors.push(`${folder.name}: ${errorMessage(e)}`);
+      // Make sure a half-done folder isn't left broken.
+      try { await ops.share(folder.id); } catch { /* reported below */ }
+      out.errors.push(`${folder.name}: ${errorMessage(e)} (the folder's link was put back)`);
     }
   }
   out.errors.push(...ctx.result.errors);
