@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
 import { safeNext } from "@/lib/safe-next";
+import { after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type LoginState = { status: "idle" } | { status: "sent"; email: string } | { status: "error"; message: string };
@@ -50,13 +51,42 @@ export async function sendMagicLink(_prev: LoginState, formData: FormData): Prom
   }
 
   // Don't reveal whether an email is on file; treat "user not found" as sent.
+  // Admins still see every request that sent no link (daily digest, Team page).
+  // Logging runs after the response so it adds no delay to these paths.
+  if (error && /only request this after/i.test(error.message)) {
+    // Per-person cooldown: a link went to this address under a minute ago. Say "sent" like
+    // any other request (an error here would reveal the email is on file) and log nothing.
+    return { status: "sent", email };
+  }
   if (error && !/not\s*found|signups?\s*not\s*allowed/i.test(error.message)) {
-    if (/rate limit/i.test(error.message)) {
+    const detail = error.message;
+    if (/rate limit/i.test(detail)) {
+      after(() => logMiss(email, "rate_limited", detail));
       return { status: "error", message: "Too many sign-in emails were requested recently. Please wait a little while and try again." };
     }
+    after(() => logMiss(email, "error", detail));
     return { status: "error", message: "We couldn't send the link just now. Please try again in a minute." };
   }
+  if (error) after(() => logMiss(email, "not_on_file", null));
   return { status: "sent", email };
+}
+
+/** Records a sign-in request that sent no link. Never blocks or fails the sign-in itself. */
+async function logMiss(email: string, outcome: "not_on_file" | "rate_limited" | "error", detail: string | null) {
+  try {
+    const admin = createAdminClient();
+    // One row per email and outcome per hour is plenty, and keeps repeat clicks (or abuse) from filling the table.
+    const hourAgo = new Date(Date.now() - 3600 * 1000).toISOString();
+    const { data: recent } = await admin.from("signin_attempts").select("id").eq("email", email).eq("outcome", outcome).gte("created_at", hourAgo).limit(1);
+    if (recent && recent.length) return;
+    // And at most 100 rows an hour overall, so a flood of made-up emails can't bury real ones.
+    const { count } = await admin.from("signin_attempts").select("id", { count: "exact", head: true }).gte("created_at", hourAgo);
+    if ((count ?? 0) >= 100) return;
+    const { error } = await admin.from("signin_attempts").insert({ email, outcome, detail: detail?.slice(0, 300) ?? null });
+    if (error) console.error("login: could not log sign-in miss", error.message);
+  } catch (e) {
+    console.error("login: could not log sign-in miss", e);
+  }
 }
 
 /** Confirms the email of an existing, unconfirmed auth user who has a profile. Returns true if it did. */

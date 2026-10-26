@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createBrowserClient } from "@supabase/ssr";
+import { landingFor } from "@/lib/auth/landing";
 
 /** Finishes an implicit-flow magic link: reads the tokens from the URL fragment and stores the session. */
 export function CompleteSignIn({ next }: { next: string }) {
@@ -28,9 +29,9 @@ export function CompleteSignIn({ next }: { next: string }) {
     });
     supabase.auth
       .setSession({ access_token, refresh_token })
-      .then(({ error }) => {
+      .then(async ({ error }) => {
         if (error) setFailed(true);
-        else window.location.replace(next);
+        else window.location.replace(await landingFor(supabase, next));
       });
   }, [next]);
 

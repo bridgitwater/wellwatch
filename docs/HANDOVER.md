@@ -87,6 +87,14 @@ Scale: medium — 50 to 500 funders and wells. Budget: free tiers wherever possi
 
 ## 6. Status
 
+### 26 Oct 2026 (admin experience batch)
+- **Team page** (Admin → Team): add an admin by email (creates a confirmed account or promotes an existing funder, then emails a welcome with a sign-in link), send a fresh sign-in link, remove admin access (not yourself). Replaces adding staff in the Supabase dashboard + SQL. `src/lib/admin/team-actions.ts`.
+- **Funder welcome step**: `well_funders.welcomed_at`. Linking a funder sends nothing; the notifier skips funders until an admin presses "Send welcome email" on the well page (or ticks it when linking). Welcome and team emails link to **/auth/confirm**, which signs in only when the person presses a button, so corporate mail scanners can't use up the one-time token. Every new link replaces the person's previous one. Links last the project's email OTP lifetime (1 hour; consider raising to 24 h in Supabase → Auth → Email).
+- **Sign-in misses**: requests that sent no link (not on file / rate limited / error) go to `signin_attempts` (admin-read only, max 100 rows/hour, 90-day retention in the notifier) and appear in the daily digest and on the Team page. The page still says "a link is on its way" to everyone, including during the per-person 60-second cooldown.
+- **Admin forms** all go through `src/components/admin/action-form.tsx`: errors and "Saved" show by the button, deletes ask first, typed text survives a failed save.
+- Small: Drive sync time shows in the viewer's own time zone; admins land on /admin after signing in (and when already signed in at /login); one label ("Handed to the community") for the last stage everywhere; page titles; sign-in copy for staff; digest now covers everything since the previous digest and no longer drifts a day.
+- Migration `20261026000000_welcome_and_signin_log.sql` must be applied **before** this code is deployed (the notifier reads `welcomed_at`).
+
 ### 26 Oct 2026 (Carla couldn't sign in)
 - Carla's admin login is **carla@bridgitwater.org** (not info@). Dusty added her on 21 Oct with Supabase's "Invite user"; she opened the invite after it expired, so her email stayed unconfirmed. Supabase treats an unconfirmed user's sign-in as a new signup, signups are disabled, and `login/actions.ts` hid that `signup_disabled` error behind "a sign-in link is on its way" — so nothing ever arrived.
 - Fixed (ad81821): on `signup_disabled`, if the email has a profile, the action confirms it with the service role and resends the link. Expired links that land on /login with `#error=` now show the "link expired" notice. Verified live: carla@ confirmed 26 Oct 07:35 UTC, role admin, link issued.
@@ -110,14 +118,14 @@ Done and live: everything above, including Phase 0 of the roadmap (sync reliabil
 - Housekeeping: GitHub Actions secrets `APP_URL`/`CRON_SECRET` still hold old values (manual fallback only); revoke the old `wellwatch-claude` GitHub token and delete `wellwatch-push` when not needed; re-add Organization Administrator role in GCP; Vercel deployment protection for `*.vercel.app` URLs; clear `_to_delete/` folders on the Mac.
 - Decide budget stance: US$0 vs ~US$40/mo (Vercel Pro + Resend Pro) as funders grow.
 - Decide whether the public example page should name the sponsoring family (it currently shows the `sponsor_line`).
-- Make sure `wellwatch@bridgitwater.org` exists as a mailbox or alias in Google Workspace (it is now the sender and the contact address in every email and page footer).
+- Make sure `wellwatch@bridgitwater.org` exists as a mailbox or alias in Google Workspace (it is now the sender and the contact address in every email and page footer). As of 26 Oct a test email to it still reached nobody.
 
 ---
 
 ## 7. Working on it with Claude (practical notes)
 
 - **Start a task with the repo attached** (pick `bridgitwater/wellwatch` in the composer). If the cloud git proxy still refuses to push ("not in this session's authorized repository set"), the fallback is: bundle commits (`git bundle create`), copy the bundle to the Mac's checkout, `git fetch` it there and push from the Mac's shell with a fine-grained GitHub token (`wellwatch-push`, Contents: read/write on bridgitwater/wellwatch) — the Mac VM can reach github.com.
-- **Database changes**: paste migration SQL into the Supabase SQL editor (Claude does this through the built-in browser pane; the pane's Monaco editor accepts typed text; ⌘-Enter doesn't fire, click Run). Apply app code first, then migrations that revoke columns.
+- **Database changes**: paste migration SQL into the Supabase SQL editor (Claude does this through the built-in browser pane; the pane's Monaco editor accepts typed text; ⌘-Enter doesn't fire, click Run). Order matters: apply **additive** migrations (new columns/tables the code reads, e.g. 26 Oct) **before** deploying the code; apply migrations that **revoke** columns **after** the code that stops using them.
 - **Supabase auth templates**: editable through the pane via `monaco.editor.getModels()[0]` + `executeEdits`, then Save; allow a couple of minutes before testing.
 - **Vercel**: env vars are under Settings → Environments → Production. A variable created as "Secret" can't be revealed or edited to Config — delete and recreate. `CRON_SECRET` is Secret type.
 - **Browser pane quirks**: when the pane is hidden, coordinate clicks often don't land — use `find` + `ref` clicks, `form_input`, or `javascript_tool` with `form.requestSubmit()`. The pane's cookies are per-host (the new domain needed a fresh sign-in).

@@ -122,5 +122,26 @@ do $$ begin
 exception when insufficient_privilege then null; end $$;  -- anon has no SELECT on wells at all
 select pg_temp.assert((select count(*) from updates) = 0, 'anon sees no updates');
 
+-- signin_attempts: admins read, nobody but the service role writes ------------------
+reset role; insert into signin_attempts (email, outcome) values ('stranger@example.com', 'not_on_file');
+select pg_temp.as_user('10000000-0000-0000-0000-000000000011');
+select pg_temp.assert((select count(*) from signin_attempts) = 0, 'funder cannot read signin_attempts');
+do $$ begin
+  insert into signin_attempts (email, outcome) values ('x@example.com', 'error');
+  raise exception 'ASSERT FAILED: funder inserted a signin_attempts row';
+exception when insufficient_privilege then null; end $$;
+select pg_temp.as_user('10000000-0000-0000-0000-000000000001');
+select pg_temp.assert((select count(*) from signin_attempts) = 1, 'admin reads signin_attempts');
+do $$ begin
+  insert into signin_attempts (email, outcome) values ('x@example.com', 'error');
+  raise exception 'ASSERT FAILED: admin inserted a signin_attempts row directly';
+exception when insufficient_privilege then null; end $$;
+-- welcomed_at: funders read their own link's welcomed_at but cannot set it
+select pg_temp.as_user('10000000-0000-0000-0000-000000000011');
+do $$ begin
+  update well_funders set welcomed_at = now() where profile_id = auth.uid();
+  perform pg_temp.assert(not exists (select 1 from well_funders where profile_id = auth.uid() and welcomed_at > now() - interval '1 minute'), 'funder cannot stamp their own welcomed_at');
+end $$;
+
 rollback;
 \echo RLS OK

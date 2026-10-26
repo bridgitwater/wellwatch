@@ -1,12 +1,16 @@
 import Link from "next/link";
 import { Shell } from "@/components/shell";
 import { requireAdmin } from "@/lib/admin/guard";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: { template: "%s · Admin · WellWatch", default: "Admin · WellWatch" } };
 
 const NAV = [
   ["/admin", "Today"],
   ["/admin/wells", "Wells"],
   ["/admin/partners", "Partners"],
   ["/admin/import", "Import"],
+  ["/admin/team", "Team"],
 ] as const;
 
 export default async function AdminLayout({ children }: LayoutProps<"/admin">) {

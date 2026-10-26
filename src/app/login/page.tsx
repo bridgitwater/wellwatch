@@ -21,6 +21,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
             WellWatch is where Bridgit funders see the progress, photos and people behind the well they gave.
             Enter the email you used when you funded it and we&apos;ll send a sign-in link — no password needed.
           </p>
+          <p className="text-sm text-ink-3 mt-2">Bridgit team or partner? Use the email your WellWatch welcome was sent to.</p>
         </div>
         {error && (
           <div className="mb-4 rounded-lg bg-clay-soft text-clay px-4 py-3 text-sm">

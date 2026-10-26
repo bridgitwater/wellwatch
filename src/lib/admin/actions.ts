@@ -9,6 +9,7 @@ import { createWellFolder } from "../drive/client";
 import { STAGE_ORDER, type WellStage } from "../stages";
 import { requireAdmin } from "./guard";
 import { ensureFunderProfile } from "./funders";
+import { sendFunderWelcome } from "../email/welcome";
 import { countryTimeZone, exifLocalToIso, tzOffsetMinutes } from "../timezones";
 
 export type ActionResult = { ok: true; message?: string } | { ok: false; error: string };
@@ -25,6 +26,11 @@ function fields(fd: FormData) {
 function fail(e: unknown): ActionResult {
   const msg = errorMessage(e);
   return { ok: false, error: msg };
+}
+
+/** Turns a Supabase write result into what the admin sees next to the button. */
+function result(error: unknown, message?: string): ActionResult {
+  return error ? fail(error) : { ok: true, message };
 }
 
 // ---------------------------------------------------------------------------
@@ -126,19 +132,20 @@ export async function updateWell(_prev: ActionResult | null, fd: FormData): Prom
 // ---------------------------------------------------------------------------
 // Stages
 // ---------------------------------------------------------------------------
-export async function setStage(fd: FormData): Promise<void> {
+export async function setStage(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   await requireAdmin();
   const well_id = String(fd.get("well_id"));
   const code = String(fd.get("code"));
   const stage = String(fd.get("stage")) as WellStage;
-  if (!STAGE_ORDER.includes(stage)) return;
+  if (!STAGE_ORDER.includes(stage)) return { ok: false, error: "Unknown stage" };
   const reached_at = (fd.get("reached_at") as string) || null;
   const expected_at = (fd.get("expected_at") as string) || null;
   const note = ((fd.get("note") as string) || "").trim() || null;
   const supabase = await createClient();
-  await supabase.from("stages").upsert({ well_id, stage, reached_at, expected_at, note }, { onConflict: "well_id,stage" });
+  const { error } = await supabase.from("stages").upsert({ well_id, stage, reached_at, expected_at, note }, { onConflict: "well_id,stage" });
   revalidatePath(`/admin/wells/${code}`);
   revalidatePath(`/wells/${code}`);
+  return result(error, "Saved");
 }
 
 // ---------------------------------------------------------------------------
@@ -153,6 +160,7 @@ const funderSchema = z.object({
   currency: str(3).default("AUD").transform((s) => s.toUpperCase()),
   funded_at: optDate,
   is_primary: z.preprocess((v) => v === "on", z.boolean()),
+  send_welcome: z.preprocess((v) => v === "on", z.boolean()),
 });
 
 /** Links a funder (creating their account if needed) to a well. */
@@ -160,33 +168,57 @@ export async function addFunder(_prev: ActionResult | null, fd: FormData): Promi
   await requireAdmin();
   const parsed = funderSchema.safeParse(fields(fd));
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
-  const { well_id, code, email, display_name, amount, currency, funded_at, is_primary } = parsed.data;
+  const { well_id, code, email, display_name, amount, currency, funded_at, is_primary, send_welcome } = parsed.data;
 
+  let linkId: string;
   try {
     const profileId = await ensureFunderProfile(email, display_name ?? null);
     const supabase = await createClient();
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("well_funders")
-      .upsert({ well_id, profile_id: profileId, amount, currency, funded_at, is_primary }, { onConflict: "well_id,profile_id" });
+      .upsert({ well_id, profile_id: profileId, amount, currency, funded_at, is_primary }, { onConflict: "well_id,profile_id" })
+      .select("id")
+      .single();
     if (error) throw error;
+    linkId = data.id;
   } catch (e) {
     return fail(e);
   }
   revalidatePath(`/admin/wells/${code}`);
-  return { ok: true, message: `${email} linked` };
+  if (!send_welcome) return { ok: true, message: `${email} linked. No emails go to them until you send their welcome.` };
+  try {
+    await sendFunderWelcome(linkId);
+    revalidatePath(`/admin/wells/${code}`);
+    return { ok: true, message: `${email} linked and welcomed` };
+  } catch (e) {
+    return { ok: false, error: `${email} linked, but the welcome email failed: ${errorMessage(e)}` };
+  }
 }
 
-export async function removeFunder(fd: FormData): Promise<void> {
+export async function removeFunder(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   await requireAdmin();
   const supabase = await createClient();
-  await supabase.from("well_funders").delete().eq("id", String(fd.get("id")));
+  const { error } = await supabase.from("well_funders").delete().eq("id", String(fd.get("id")));
   revalidatePath(`/admin/wells/${String(fd.get("code"))}`);
+  return result(error);
+}
+
+/** Sends a funder their welcome email for this well; from then on they get update emails. */
+export async function sendWelcome(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  await requireAdmin();
+  try {
+    const email = await sendFunderWelcome(String(fd.get("id")));
+    revalidatePath(`/admin/wells/${String(fd.get("code"))}`);
+    return { ok: true, message: `Welcome sent to ${email}` };
+  } catch (e) {
+    return fail(e);
+  }
 }
 
 // ---------------------------------------------------------------------------
 // Updates & media
 // ---------------------------------------------------------------------------
-export async function saveUpdate(fd: FormData): Promise<void> {
+export async function saveUpdate(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   await requireAdmin();
   const id = String(fd.get("id"));
   const code = String(fd.get("code"));
@@ -210,42 +242,46 @@ export async function saveUpdate(fd: FormData): Promise<void> {
       if (iso && iso !== row.happened_at) patch.happened_at = iso;
     }
   }
-  await supabase.from("updates").update(patch).eq("id", id);
+  const { error } = await supabase.from("updates").update(patch).eq("id", id);
   revalidatePath(`/admin/wells/${code}`);
   revalidatePath(`/wells/${code}`);
   revalidatePath("/admin");
+  return result(error, "Saved");
 }
 
-export async function toggleUpdateHidden(fd: FormData): Promise<void> {
+export async function toggleUpdateHidden(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   await requireAdmin();
   const id = String(fd.get("id"));
   const hide = fd.get("hide") === "1";
   const supabase = await createClient();
-  await supabase.from("updates").update({ status: hide ? "hidden" : "published" }).eq("id", id);
+  const { error } = await supabase.from("updates").update({ status: hide ? "hidden" : "published" }).eq("id", id);
   revalidatePath("/admin");
   revalidatePath(`/admin/wells/${String(fd.get("code"))}`);
   revalidatePath(`/wells/${String(fd.get("code"))}`);
+  return result(error);
 }
 
-export async function toggleMediaHidden(fd: FormData): Promise<void> {
+export async function toggleMediaHidden(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   await requireAdmin();
   const id = String(fd.get("id"));
   const hide = fd.get("hide") === "1";
   const supabase = await createClient();
-  await supabase.from("media").update({ hidden: hide }).eq("id", id);
+  const { error } = await supabase.from("media").update({ hidden: hide }).eq("id", id);
   revalidatePath(`/admin/wells/${String(fd.get("code"))}`);
   revalidatePath(`/wells/${String(fd.get("code"))}`);
+  return result(error);
 }
 
-export async function setMediaTag(fd: FormData): Promise<void> {
+export async function setMediaTag(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   await requireAdmin();
   const id = String(fd.get("id"));
   const tag = ((fd.get("tag") as string) || "").trim() || null;
   const caption = ((fd.get("caption") as string) || "").trim() || null;
   const supabase = await createClient();
-  await supabase.from("media").update({ tag, caption }).eq("id", id);
+  const { error } = await supabase.from("media").update({ tag, caption }).eq("id", id);
   revalidatePath(`/admin/wells/${String(fd.get("code"))}`);
   revalidatePath(`/wells/${String(fd.get("code"))}`);
+  return result(error, "Saved");
 }
 
 // ---------------------------------------------------------------------------
@@ -274,37 +310,39 @@ export async function addTestimonial(_prev: ActionResult | null, fd: FormData): 
   return { ok: true, message: "Added" };
 }
 
-export async function deleteTestimonial(fd: FormData): Promise<void> {
+export async function deleteTestimonial(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   await requireAdmin();
   const supabase = await createClient();
-  await supabase.from("testimonials").delete().eq("id", String(fd.get("id")));
+  const { error } = await supabase.from("testimonials").delete().eq("id", String(fd.get("id")));
   revalidatePath(`/admin/wells/${String(fd.get("code"))}`);
   revalidatePath(`/wells/${String(fd.get("code"))}`);
+  return result(error);
 }
 
-export async function createNote(fd: FormData): Promise<void> {
+export async function createNote(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   const profile = await requireAdmin();
   const well_id = String(fd.get("well_id"));
   const code = String(fd.get("code"));
   const body = ((fd.get("body") as string) || "").trim();
-  if (!body) return;
+  if (!body) return { ok: false, error: "Write something first" };
   const stage = (fd.get("stage") as WellStage) || null;
   const supabase = await createClient();
-  await supabase.from("updates").insert({ well_id, author_id: profile.id, source: "admin", stage, body });
+  const { error } = await supabase.from("updates").insert({ well_id, author_id: profile.id, source: "admin", stage, body });
   revalidatePath(`/admin/wells/${code}`);
   revalidatePath(`/wells/${code}`);
+  return result(error, "Posted");
 }
 
 // ---------------------------------------------------------------------------
 // Costs & water tests
 // ---------------------------------------------------------------------------
-export async function addCost(fd: FormData): Promise<void> {
+export async function addCost(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   await requireAdmin();
   const code = String(fd.get("code"));
   const amount = Number(fd.get("amount"));
-  if (!Number.isFinite(amount)) return;
+  if (!Number.isFinite(amount)) return { ok: false, error: "Enter an amount" };
   const supabase = await createClient();
-  await supabase.from("costs").insert({
+  const { error } = await supabase.from("costs").insert({
     well_id: String(fd.get("well_id")),
     category: String(fd.get("category")),
     amount,
@@ -313,17 +351,19 @@ export async function addCost(fd: FormData): Promise<void> {
   });
   revalidatePath(`/admin/wells/${code}`);
   revalidatePath(`/wells/${code}`);
+  return result(error, "Added");
 }
 
-export async function deleteCost(fd: FormData): Promise<void> {
+export async function deleteCost(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   await requireAdmin();
   const supabase = await createClient();
-  await supabase.from("costs").delete().eq("id", String(fd.get("id")));
+  const { error } = await supabase.from("costs").delete().eq("id", String(fd.get("id")));
   revalidatePath(`/admin/wells/${String(fd.get("code"))}`);
   revalidatePath(`/wells/${String(fd.get("code"))}`);
+  return result(error);
 }
 
-export async function addWaterTest(fd: FormData): Promise<void> {
+export async function addWaterTest(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   await requireAdmin();
   const code = String(fd.get("code"));
   const num = (k: string) => {
@@ -331,7 +371,7 @@ export async function addWaterTest(fd: FormData): Promise<void> {
     return v === null || v === "" ? null : Number(v);
   };
   const supabase = await createClient();
-  await supabase.from("water_tests").insert({
+  const { error } = await supabase.from("water_tests").insert({
     well_id: String(fd.get("well_id")),
     tested_at: String(fd.get("tested_at")),
     ph: num("ph"),
@@ -345,22 +385,24 @@ export async function addWaterTest(fd: FormData): Promise<void> {
   });
   revalidatePath(`/admin/wells/${code}`);
   revalidatePath(`/wells/${code}`);
+  return result(error, "Added");
 }
 
 // ---------------------------------------------------------------------------
 // Organizations
 // ---------------------------------------------------------------------------
-export async function createOrganization(fd: FormData): Promise<void> {
+export async function createOrganization(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   await requireAdmin();
   const name = ((fd.get("name") as string) || "").trim();
-  if (!name) return;
+  if (!name) return { ok: false, error: "Name is required" };
   const supabase = await createClient();
-  await supabase.from("organizations").insert({
+  const { error } = await supabase.from("organizations").insert({
     name,
     country: ((fd.get("country") as string) || "").trim().toUpperCase() || null,
     type: "partner",
   });
   revalidatePath("/admin/partners");
+  return result(error, "Added");
 }
 
 export async function updateOrganization(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {

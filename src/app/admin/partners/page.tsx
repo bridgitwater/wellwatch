@@ -1,3 +1,4 @@
+import { ActionForm } from "@/components/admin/action-form";
 import { createOrganization } from "@/lib/admin/actions";
 import { PartnerForm } from "@/components/admin/partner-form";
 import { Button, Card, Field, Input } from "@/components/admin/ui";
@@ -6,6 +7,8 @@ import { createClient } from "@/lib/supabase/server";
 import type { Partner } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+
+export const metadata = { title: "Partners" };
 
 export default async function Partners() {
   const supabase = await createClient();
@@ -40,11 +43,11 @@ export default async function Partners() {
         </ul>
       </Card>
       <Card title="Add a partner">
-        <form action={createOrganization} className="flex flex-col gap-3">
+        <ActionForm action={createOrganization} resetOnSuccess className="flex flex-col gap-3">
           <Field label="Name"><Input name="name" required placeholder="Suubi Community Projects Uganda" /></Field>
           <Field label="Country code"><Input name="country" maxLength={2} placeholder="UG" /></Field>
           <Button type="submit">Add partner</Button>
-        </form>
+        </ActionForm>
         <p className="text-xs text-ink-3 mt-4">Partners are the implementing organisations on the ground. Their introduction and contact appear on every funder page for wells assigned to them.</p>
       </Card>
     </div>

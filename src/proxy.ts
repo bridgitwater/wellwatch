@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { safeNext } from "@/lib/safe-next";
 
 /**
  * Refreshes the Supabase session cookie on every request and sends
@@ -44,10 +45,19 @@ export async function proxy(request: NextRequest) {
     url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
   }
-  if (pathname === "/login" && signedIn) {
+  // A "link expired" notice is shown even when signed in, so the person can ask for their own link.
+  if (pathname === "/login" && signedIn && !request.nextUrl.searchParams.has("error")) {
+    // Already signed in: go where the link asked, or for the default, to /admin for staff.
+    let dest = safeNext(request.nextUrl.searchParams.get("next"));
+    if (dest === "/wells") {
+      const { data: me } = await supabase.from("profiles").select("role").eq("id", String(data?.claims?.sub ?? "")).maybeSingle();
+      if (me?.role === "admin") dest = "/admin";
+    }
+    const target = new URL(dest, request.nextUrl.origin);
     const url = request.nextUrl.clone();
-    url.pathname = "/wells";
-    url.search = "";
+    url.pathname = target.pathname;
+    url.search = target.search;
+    url.hash = target.hash;
     return NextResponse.redirect(url);
   }
 

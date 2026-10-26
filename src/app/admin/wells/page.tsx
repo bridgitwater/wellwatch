@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { WellStage } from "@/lib/stages";
 
 export const dynamic = "force-dynamic";
+export const metadata = { title: "Wells" };
 
 export default async function AdminWells({ searchParams }: PageProps<"/admin/wells">) {
   const sp = await searchParams;

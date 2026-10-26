@@ -3,6 +3,8 @@ import { ImportForm } from "@/components/admin/import-form";
 import { FUNDERS_CSV_COLUMNS, WELLS_CSV_COLUMNS } from "@/lib/admin/csv";
 import { importFundersCsv, importWellsCsv } from "@/lib/admin/import";
 
+export const metadata = { title: "Import" };
+
 export default function ImportPage() {
   return (
     <div className="grid gap-6 lg:grid-cols-2">
@@ -17,7 +19,7 @@ export default function ImportPage() {
       </Card>
       <Card title="2. Import funders">
         <p className="text-sm text-ink-2 mb-3">
-          One row per funder-to-well link. Creates the funder&apos;s account if it doesn&apos;t exist (no email is sent — they sign in whenever they first visit).
+          One row per funder-to-well link. Creates the funder&apos;s account if it doesn&apos;t exist. No email is sent: send each funder&apos;s welcome from the well page when you&apos;re ready, and they get no update emails before that.
           <code className="text-xs"> is_primary</code> is yes/no.
         </p>
         <pre className="text-xs bg-bg rounded-md p-3 overflow-x-auto mb-4">{FUNDERS_CSV_COLUMNS.join(",")}</pre>

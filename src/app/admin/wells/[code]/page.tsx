@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { addCost, addWaterTest, createNote, deleteCost, deleteTestimonial, removeFunder, saveUpdate, setMediaTag, setStage, toggleMediaHidden } from "@/lib/admin/actions";
+import { addCost, addWaterTest, createNote, deleteCost, deleteTestimonial, removeFunder, saveUpdate, sendWelcome, setMediaTag, setStage, toggleMediaHidden } from "@/lib/admin/actions";
+import { ActionForm } from "@/components/admin/action-form";
 import { TestimonialForm } from "@/components/admin/testimonial-form";
 import { FunderForm } from "@/components/admin/funder-form";
 import { Button, Card, Field, Input, Select, Textarea } from "@/components/admin/ui";
@@ -15,6 +16,11 @@ import { COST_LABEL, type Cost, type StageRow, type Testimonial, type WaterTest,
 
 export const dynamic = "force-dynamic";
 
+export async function generateMetadata({ params }: PageProps<"/admin/wells/[code]">) {
+  const { code } = await params;
+  return { title: code };
+}
+
 export default async function AdminWell({ params }: PageProps<"/admin/wells/[code]">) {
   const { code } = await params;
   const supabase = await createClient();
@@ -25,7 +31,7 @@ export default async function AdminWell({ params }: PageProps<"/admin/wells/[cod
   const [orgs, stages, funders, updates, costs, tests, testimonials, privateFields] = await Promise.all([
     supabase.from("organizations").select("id, name").eq("type", "partner").order("name"),
     supabase.from("stages").select("stage, reached_at, expected_at, note").eq("well_id", well.id),
-    supabase.from("well_funders").select("id, amount, currency, funded_at, is_primary, profiles(email, display_name)").eq("well_id", well.id).order("funded_at"),
+    supabase.from("well_funders").select("id, amount, currency, funded_at, is_primary, welcomed_at, profiles(email, display_name)").eq("well_id", well.id).order("funded_at"),
     supabase.from("updates").select("id, body, stage, status, source, happened_at, media(id, drive_file_id, kind, name, hidden, tag, caption)").eq("well_id", well.id).order("happened_at", { ascending: false }),
     supabase.from("costs").select("id, category, amount, currency, note").eq("well_id", well.id),
     supabase.from("water_tests").select("*").eq("well_id", well.id).order("tested_at", { ascending: false }),
@@ -34,7 +40,7 @@ export default async function AdminWell({ params }: PageProps<"/admin/wells/[cod
   ]);
 
   const stageBy = new Map(((stages.data ?? []) as StageRow[]).map((s) => [s.stage, s]));
-  type FunderRow = { id: string; amount: string | null; currency: string; funded_at: string | null; is_primary: boolean; profiles: { email: string; display_name: string | null } | null };
+  type FunderRow = { id: string; amount: string | null; currency: string; funded_at: string | null; is_primary: boolean; welcomed_at: string | null; profiles: { email: string; display_name: string | null } | null };
   const funderRows = (funders.data ?? []) as unknown as FunderRow[];
   // Private columns (exact GPS, contractor) are not selectable by the authenticated role;
   // admins read them through this security-definer RPC.
@@ -69,14 +75,14 @@ export default async function AdminWell({ params }: PageProps<"/admin/wells/[cod
               {STAGE_ORDER.map((s) => {
                 const row = stageBy.get(s);
                 return (
-                  <form key={s} action={setStage} className="py-3 grid gap-2 sm:grid-cols-[150px_140px_140px_1fr_auto] sm:items-end">
+                  <ActionForm key={s} action={setStage} className="py-3 grid gap-2 sm:grid-cols-[150px_140px_140px_1fr_auto] sm:items-end">
                     <input type="hidden" name="well_id" value={w.id} /><input type="hidden" name="code" value={w.code} /><input type="hidden" name="stage" value={s} />
                     <div className="font-semibold text-sm pb-2">{STAGE_LABEL[s]}</div>
                     <Field label="Reached"><Input type="date" name="reached_at" defaultValue={row?.reached_at ?? ""} /></Field>
                     <Field label="Expected"><Input type="date" name="expected_at" defaultValue={row?.expected_at ?? ""} /></Field>
                     <Field label="Note (shown to funders)"><Input name="note" defaultValue={row?.note ?? ""} /></Field>
                     <Button variant="ghost" type="submit">Save</Button>
-                  </form>
+                  </ActionForm>
                 );
               })}
             </div>
@@ -84,16 +90,16 @@ export default async function AdminWell({ params }: PageProps<"/admin/wells/[cod
 
           {/* Updates */}
           <Card title={`Updates (${updates.data?.length ?? 0})`}>
-            <form action={createNote} className="mb-5 grid gap-2 sm:grid-cols-[1fr_160px_auto] sm:items-end">
+            <ActionForm action={createNote} resetOnSuccess className="mb-5 grid gap-2 sm:grid-cols-[1fr_160px_auto] sm:items-end">
               <input type="hidden" name="well_id" value={w.id} /><input type="hidden" name="code" value={w.code} />
               <Field label="Add a written update"><Textarea name="body" className="min-h-16" placeholder="A sentence or two for funders. Photos arrive from Drive separately." /></Field>
               <Field label="Stage"><Select name="stage" defaultValue={w.status}>{STAGE_ORDER.map((s) => <option key={s} value={s}>{STAGE_LABEL[s]}</option>)}</Select></Field>
               <Button type="submit">Post</Button>
-            </form>
+            </ActionForm>
             <ul className="flex flex-col gap-4">
               {(updates.data ?? []).map((u) => (
                 <li key={u.id} className={`rounded-lg border border-line p-4 ${u.status === "hidden" ? "opacity-60" : ""}`}>
-                  <form action={saveUpdate} className="grid gap-2 sm:grid-cols-[1fr_140px_150px_120px_auto] sm:items-end">
+                  <ActionForm action={saveUpdate} className="grid gap-2 sm:grid-cols-[1fr_140px_150px_120px_auto] sm:items-end">
                     <input type="hidden" name="id" value={u.id} /><input type="hidden" name="code" value={w.code} />
                     <Field label={`${fmtDateIn(w.country, u.happened_at, { hour: "2-digit", minute: "2-digit" })} (local) · ${u.source}`}>
                       <Textarea name="body" defaultValue={u.body ?? ""} className="min-h-14" placeholder="No note yet — add one for funders" />
@@ -102,7 +108,7 @@ export default async function AdminWell({ params }: PageProps<"/admin/wells/[cod
                     <Field label="Stage"><Select name="stage" defaultValue={u.stage ?? ""}><option value="">—</option>{STAGE_ORDER.map((s) => <option key={s} value={s}>{STAGE_LABEL[s]}</option>)}</Select></Field>
                     <Field label="Visibility"><Select name="status" defaultValue={u.status}><option value="published">Published</option><option value="hidden">Hidden</option></Select></Field>
                     <Button variant="ghost" type="submit">Save</Button>
-                  </form>
+                  </ActionForm>
                   {u.media.length > 0 && (
                     <ul className="mt-3 grid gap-2 sm:grid-cols-2">
                       {u.media.map((m) => (
@@ -113,12 +119,12 @@ export default async function AdminWell({ params }: PageProps<"/admin/wells/[cod
                             ) : (
                               <div className="h-20 w-20 rounded bg-aquifer text-xs flex items-center justify-center text-water-deep">{m.kind}</div>
                             )}
-                            <form action={toggleMediaHidden} className="absolute bottom-1 right-1">
+                            <ActionForm action={toggleMediaHidden} quiet className="absolute bottom-1 right-1">
                               <input type="hidden" name="id" value={m.id} /><input type="hidden" name="code" value={w.code} /><input type="hidden" name="hide" value={m.hidden ? "0" : "1"} />
                               <button type="submit" className="rounded bg-black/60 text-white text-[10px] px-1.5 py-0.5">{m.hidden ? "show" : "hide"}</button>
-                            </form>
+                            </ActionForm>
                           </div>
-                          <form action={setMediaTag} className="flex-1 grid gap-1 text-xs">
+                          <ActionForm action={setMediaTag} className="flex-1 grid gap-1 text-xs">
                             <input type="hidden" name="id" value={m.id} /><input type="hidden" name="code" value={w.code} />
                             <Select name="tag" defaultValue={m.tag ?? ""} className="!py-1 !text-xs">
                               <option value="">No tag</option>
@@ -128,7 +134,7 @@ export default async function AdminWell({ params }: PageProps<"/admin/wells/[cod
                             </Select>
                             <Input name="caption" defaultValue={m.caption ?? ""} placeholder="Caption for funders" className="!py-1 !text-xs" />
                             <button type="submit" className="justify-self-start text-water font-semibold">Save</button>
-                          </form>
+                          </ActionForm>
                         </li>
                       ))}
                     </ul>
@@ -147,7 +153,7 @@ export default async function AdminWell({ params }: PageProps<"/admin/wells/[cod
                       <div className="font-semibold">{t.name}{t.age ? `, ${t.age}` : ""}{t.role ? <span className="text-ink-2 font-normal"> · {t.role}</span> : null}</div>
                       <p className="text-ink-2 mt-1 line-clamp-3">“{t.quote}”</p>
                     </div>
-                    <form action={deleteTestimonial}><input type="hidden" name="id" value={t.id} /><input type="hidden" name="code" value={w.code} /><Button variant="danger" type="submit">Remove</Button></form>
+                    <ActionForm action={deleteTestimonial} quiet confirm={`Remove ${t.name}’s testimonial? This can’t be undone.`}><input type="hidden" name="id" value={t.id} /><input type="hidden" name="code" value={w.code} /><Button variant="danger" type="submit">Remove</Button></ActionForm>
                   </li>
                 ))}
               </ul>
@@ -165,12 +171,21 @@ export default async function AdminWell({ params }: PageProps<"/admin/wells/[cod
             {funderRows.length > 0 && (
               <ul className="mb-5 flex flex-col divide-y divide-line text-sm">
                 {funderRows.map((f) => (
-                  <li key={f.id} className="py-2 flex items-center justify-between gap-2">
-                    <div className="min-w-0">
+                  <li key={f.id} className="py-2 flex flex-wrap items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
                       <div className="font-semibold truncate">{f.profiles?.display_name ?? f.profiles?.email}{f.is_primary && <span className="ml-1 text-xs text-ink-3">primary</span>}</div>
                       <div className="text-xs text-ink-2 truncate">{f.profiles?.email} · {fmtMoney(f.amount, f.currency)}{f.funded_at ? ` · ${fmtDate(f.funded_at)}` : ""}</div>
+                      {f.welcomed_at ? (
+                        <div className="text-xs text-ok">Welcomed {fmtDate(f.welcomed_at)} · gets update emails</div>
+                      ) : (
+                        <div className="text-xs text-clay">Not welcomed yet · no emails go to them</div>
+                      )}
                     </div>
-                    <form action={removeFunder}><input type="hidden" name="id" value={f.id} /><input type="hidden" name="code" value={w.code} /><Button variant="danger" type="submit">Remove</Button></form>
+                    <ActionForm action={sendWelcome} confirm={`Email ${f.profiles?.email ?? "this funder"} ${f.welcomed_at ? "another" : "their"} welcome and sign-in link for ${w.name}?${f.welcomed_at ? "" : " From then on they get update emails for this well."} Any earlier sign-in link they were sent stops working.`} className="flex flex-col items-end gap-1 max-w-56 text-right">
+                      <input type="hidden" name="id" value={f.id} /><input type="hidden" name="code" value={w.code} />
+                      <Button variant="ghost" type="submit">{f.welcomed_at ? "Resend welcome" : "Send welcome email"}</Button>
+                    </ActionForm>
+                    <ActionForm action={removeFunder} quiet confirm={`Remove ${f.profiles?.email ?? "this funder"} from ${w.name}? They will no longer see this well.`}><input type="hidden" name="id" value={f.id} /><input type="hidden" name="code" value={w.code} /><Button variant="danger" type="submit">Remove</Button></ActionForm>
                   </li>
                 ))}
               </ul>
@@ -184,18 +199,18 @@ export default async function AdminWell({ params }: PageProps<"/admin/wells/[cod
                 <li key={c.id} className="py-1.5 flex items-center justify-between gap-2">
                   <span>{COST_LABEL[c.category]}{c.note ? <span className="text-ink-3"> · {c.note}</span> : null}</span>
                   <span className="flex items-center gap-2"><span className="tnum">{fmtMoney(c.amount, c.currency)}</span>
-                    <form action={deleteCost}><input type="hidden" name="id" value={c.id} /><input type="hidden" name="code" value={w.code} /><button className="text-clay text-xs" type="submit">remove</button></form></span>
+                    <ActionForm action={deleteCost} quiet confirm="Remove this cost line?"><input type="hidden" name="id" value={c.id} /><input type="hidden" name="code" value={w.code} /><button className="text-clay text-xs" type="submit">remove</button></ActionForm></span>
                 </li>
               ))}
             </ul>
-            <form action={addCost} className="grid grid-cols-2 gap-2">
+            <ActionForm action={addCost} resetOnSuccess className="grid grid-cols-2 gap-2">
               <input type="hidden" name="well_id" value={w.id} /><input type="hidden" name="code" value={w.code} />
               <Field label="Category" className="col-span-2"><Select name="category">{Object.entries(COST_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select></Field>
               <Field label="Amount"><Input name="amount" type="number" step="0.01" required /></Field>
               <Field label="Currency"><Input name="currency" defaultValue={w.currency} maxLength={3} /></Field>
               <Field label="Note" className="col-span-2"><Input name="note" /></Field>
               <Button variant="ghost" type="submit" className="col-span-2">Add cost line</Button>
-            </form>
+            </ActionForm>
           </Card>
 
           <Card title="Water tests">
@@ -207,7 +222,7 @@ export default async function AdminWell({ params }: PageProps<"/admin/wells/[cod
                 </li>
               ))}
             </ul>
-            <form action={addWaterTest} className="grid grid-cols-2 gap-2">
+            <ActionForm action={addWaterTest} resetOnSuccess className="grid grid-cols-2 gap-2">
               <input type="hidden" name="well_id" value={w.id} /><input type="hidden" name="code" value={w.code} />
               <Field label="Date tested"><Input name="tested_at" type="date" required /></Field>
               <Field label="Lab"><Input name="lab" /></Field>
@@ -218,7 +233,7 @@ export default async function AdminWell({ params }: PageProps<"/admin/wells/[cod
               <Field label="Arsenic µg/L"><Input name="arsenic_ugl" type="number" step="0.01" /></Field>
               <label className="flex items-center gap-2 text-sm self-end pb-2"><input type="checkbox" name="passed" defaultChecked /> Passed</label>
               <Button variant="ghost" type="submit" className="col-span-2">Add test</Button>
-            </form>
+            </ActionForm>
           </Card>
         </div>
       </div>

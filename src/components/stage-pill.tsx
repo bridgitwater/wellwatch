@@ -10,7 +10,7 @@ export function StagePill({ stage, type = "drilled" }: { stage: WellStage; type?
       }`}
     >
       <span className={`h-1.5 w-1.5 rounded-full ${done ? "bg-ok" : "bg-water"}`} />
-      {done ? "Complete" : stageLabel(stage, type)}
+      {stageLabel(stage, type)}
     </span>
   );
 }

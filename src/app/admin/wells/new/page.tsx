@@ -2,6 +2,8 @@ import { WellForm } from "@/components/admin/well-form";
 import { Card } from "@/components/admin/ui";
 import { createClient } from "@/lib/supabase/server";
 
+export const metadata = { title: "New well" };
+
 export default async function NewWell() {
   const supabase = await createClient();
   const { data: orgs } = await supabase.from("organizations").select("id, name").eq("type", "partner").order("name");

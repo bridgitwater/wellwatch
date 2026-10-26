@@ -1,12 +1,15 @@
 import Link from "next/link";
 import { toggleUpdateHidden } from "@/lib/admin/actions";
 import { Button, Card } from "@/components/admin/ui";
+import { ActionForm } from "@/components/admin/action-form";
+import { LocalTime } from "@/components/local-time";
 import { DriveImage } from "@/components/drive-image";
-import { fmtDate, fmtRelative } from "@/lib/format";
+import { fmtRelative } from "@/lib/format";
 import { STAGE_LABEL, STAGE_ORDER, type WellStage } from "@/lib/stages";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
+export const metadata = { title: "Today" };
 
 export default async function AdminHome() {
   const supabase = await createClient();
@@ -53,14 +56,14 @@ export default async function AdminHome() {
                     </div>
                     <p className="text-sm text-ink-2 truncate">{u.body ?? <span className="italic text-ink-3">no note yet</span>}</p>
                   </div>
-                  <form action={toggleUpdateHidden} className="shrink-0">
+                  <ActionForm action={toggleUpdateHidden} quiet className="shrink-0">
                     <input type="hidden" name="id" value={u.id} />
                     <input type="hidden" name="code" value={u.wells?.code ?? ""} />
                     <input type="hidden" name="hide" value={u.status === "hidden" ? "0" : "1"} />
                     <Button variant={u.status === "hidden" ? "ghost" : "danger"} type="submit">
                       {u.status === "hidden" ? "Unhide" : "Hide"}
                     </Button>
-                  </form>
+                  </ActionForm>
                 </li>
               ))}
             </ul>
@@ -89,7 +92,7 @@ export default async function AdminHome() {
               <div><dt className="text-ink-2">Last error</dt><dd className="text-clay text-xs break-words">{sync.data.last_error}</dd></div>
             )}
           </dl>
-          <p className="text-xs text-ink-3 mt-3">Runs every 10 minutes. {sync.data?.last_synced_at ? `Last: ${fmtDate(sync.data.last_synced_at, { hour: "2-digit", minute: "2-digit" })}` : ""}</p>
+          <p className="text-xs text-ink-3 mt-3">Runs every 10 minutes.{sync.data?.last_synced_at ? <> Last: <LocalTime iso={sync.data.last_synced_at} /> (your time)</> : null}</p>
         </Card>
       </div>
     </div>
