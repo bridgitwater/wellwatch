@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
 import { safeNext } from "@/lib/safe-next";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export type LoginState = { status: "idle" } | { status: "sent"; email: string } | { status: "error"; message: string };
 
@@ -26,7 +27,7 @@ export async function sendMagicLink(_prev: LoginState, formData: FormData): Prom
   });
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
-  const { error } = await supabase.auth.signInWithOtp({
+  const send = () => supabase.auth.signInWithOtp({
     email,
     options: {
       // Only people the admin has invited can sign in; strangers get the same
@@ -38,6 +39,16 @@ export async function sendMagicLink(_prev: LoginState, formData: FormData): Prom
     },
   });
 
+  let { error } = await send();
+
+  // An invited-but-never-confirmed user (e.g. someone added with Supabase's
+  // "Invite user" who never clicked the invite in time) is treated by Supabase
+  // as a new signup, and signups are disabled, so no link is ever sent. If an
+  // admin has put this person on file, confirm their email and try again.
+  if (error && (error as { code?: string }).code === "signup_disabled") {
+    if (await confirmInvitedUser(email)) ({ error } = await send());
+  }
+
   // Don't reveal whether an email is on file; treat "user not found" as sent.
   if (error && !/not\s*found|signups?\s*not\s*allowed/i.test(error.message)) {
     if (/rate limit/i.test(error.message)) {
@@ -46,4 +57,22 @@ export async function sendMagicLink(_prev: LoginState, formData: FormData): Prom
     return { status: "error", message: "We couldn't send the link just now. Please try again in a minute." };
   }
   return { status: "sent", email };
+}
+
+/** Confirms the email of an existing, unconfirmed auth user who has a profile. Returns true if it did. */
+async function confirmInvitedUser(email: string): Promise<boolean> {
+  try {
+    const admin = createAdminClient();
+    const { data: profile } = await admin.from("profiles").select("id").eq("email", email).maybeSingle();
+    if (!profile) return false;
+    const { error } = await admin.auth.admin.updateUserById(profile.id, { email_confirm: true });
+    if (error) {
+      console.error("login: could not confirm invited user", error.message);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error("login: confirmInvitedUser failed", e);
+    return false;
+  }
 }
