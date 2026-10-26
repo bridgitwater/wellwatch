@@ -250,7 +250,7 @@ export async function applyShares(db: Db, fileIds: string[], ops: DriveOps = dri
   return null;
 }
 
-export type FolderResult = { madePrivate: string[]; skipped: string[]; errors: string[] };
+export type FolderResult = { madePrivate: string[]; skipped: string[]; errors: string[]; files?: number };
 
 /**
  * Makes well folders private, one at a time: remove the folder's link, give each file of
@@ -263,7 +263,14 @@ export async function makeFoldersPrivate(db: Db, files: DriveFile[], rootId: str
   const { desired, rows } = await load(db);
   const byId = new Map(files.map((f) => [f.id, f]));
   const topOf = topFolderOf(files, rootId);
-  const roots = files.filter((f) => f.mimeType === FOLDER_MIME && f.parents.includes(rootId));
+  const inFolder = (id: string) => desired.filter((d) => byId.has(d.file_id) && topOf(d.file_id) === id);
+  let roots = files.filter((f) => f.mimeType === FOLDER_MIME && f.parents.includes(rootId));
+  // A trial ("Try one folder first") should test the part that can break: pick the folder
+  // with the fewest files funders see, but at least one. An empty folder proves nothing.
+  if (Number.isFinite(max)) {
+    const n = new Map(roots.map((f) => [f.id, inFolder(f.id).length]));
+    roots = [...roots].sort((a, b) => ((n.get(a.id) || 1e9) - (n.get(b.id) || 1e9)));
+  }
   const ctx: Ctx = { db, ops, deadline, result: empty(), rows };
 
   for (const folder of roots) {
@@ -271,7 +278,7 @@ export async function makeFoldersPrivate(db: Db, files: DriveFile[], rootId: str
     if (Date.now() > deadline) { out.skipped.push(`${folder.name}: out of time, press again`); continue; }
     const row = rows.get(folder.id);
     if (row?.kind === "folder" && !row.shared && folder.augmented === false) continue; // already private
-    const inside = desired.filter((d) => byId.has(d.file_id) && topOf(d.file_id) === folder.id);
+    const inside = inFolder(folder.id);
     try {
       await ops.unshare(folder.id);
       const failed: string[] = [];
@@ -294,6 +301,7 @@ export async function makeFoldersPrivate(db: Db, files: DriveFile[], rootId: str
       }
       await record(ctx, folder.id, "folder", false, false, null);
       out.madePrivate.push(folder.name);
+      out.files = (out.files ?? 0) + inside.length;
     } catch (e) {
       // Make sure a half-done folder isn't left broken.
       try { await ops.share(folder.id); } catch { /* reported below */ }

@@ -504,7 +504,7 @@ export async function makeDriveFoldersPrivate(_prev: ActionResult | null, fd: Fo
     const r = await makeFoldersPrivate(createAdminClient(), await listAllInDrive(), sharedDriveId(), undefined, undefined, max);
     if (max === 1 && r.madePrivate.length) {
       revalidatePath("/admin");
-      return { ok: true, message: `Made "${r.madePrivate[0]}" private. Check its well page still shows its photos, then make the rest private.` };
+      return { ok: true, message: `Made "${r.madePrivate[0]}" private; ${r.files ?? 0} file${r.files === 1 ? "" : "s"} funders see now have their own link. Check its well page still shows its photos, then make the rest private.` };
     }
     revalidatePath("/admin");
     const parts = [

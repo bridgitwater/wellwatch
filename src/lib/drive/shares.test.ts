@@ -161,6 +161,23 @@ describe("making folders private (admin button)", () => {
     expect(drive.own.size).toBe(1);
   });
 
+  it("'Try one folder first' picks the smallest folder with files funders see, not an empty one", async () => {
+    const db = fakeDb([want("a", "F2"), want("b", "F2"), want("c", "F3")]);
+    const drive = fakeDrive(["F1", "F2", "F3"], [], { a: "F2", b: "F2", c: "F3" });
+    const r = await priv(db, [folder("F1"), folder("F2"), folder("F3"), file("a", "F2"), file("b", "F2"), file("c", "F3")], drive, 1);
+    expect(r.madePrivate).toEqual(["F3"]);
+    expect(r.files).toBe(1);
+    expect(drive.own.has("c")).toBe(true);
+    expect(drive.own.has("F1") && drive.own.has("F2")).toBe(true);
+  });
+
+  it("'Try one folder first' skips a folder already private and tries the next with files", async () => {
+    const db = fakeDb([want("c", "F3"), want("a", "F2"), want("b", "F2")], [{ file_id: "F3", kind: "folder", shared: false, direct: false }]);
+    const drive = fakeDrive(["F2"], [], { a: "F2", b: "F2" });
+    const r = await priv(db, [folder("F2"), folder("F3", false), file("a", "F2"), file("b", "F2"), file("c", "F3")], drive, 1);
+    expect(r.madePrivate).toEqual(["F2"]);
+  });
+
   it("finds files by where they really are, including subfolders", async () => {
     const db = fakeDb([want("deep", "WRONG")]);
     const drive = fakeDrive(["F1"], [], { deep: "S1" });
