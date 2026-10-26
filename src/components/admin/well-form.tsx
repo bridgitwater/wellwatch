@@ -105,10 +105,9 @@ export function WellForm({ well, orgs }: { well?: Well & Partial<WellPrivate>; o
       <Section title="Money & files">
         <Field label="Target cost"><Input name="target_cost" type="number" step="0.01" defaultValue={w?.target_cost ?? ""} /></Field>
         <Field label="Currency"><Input name="currency" defaultValue={w?.currency ?? "AUD"} maxLength={3} /></Field>
-        <label className="flex items-center gap-2 text-sm sm:col-span-2">
-          <input type="checkbox" name="folder_is_public" defaultChecked={w ? w.folder_is_public : true} />
-          Drive folder viewable by link (needed for video playback)
-        </label>
+        <p className="text-xs text-ink-3 sm:col-span-2">
+          The well&apos;s Drive folder is private. WellWatch shares each photo, video and report funders can see, and takes the link away when you hide one.
+        </p>
       </Section>
 
       <Section title="Public example page" hint="For showing supporters and partners what a finished well looks like. Anyone with the link can view it without signing in; the funder's gift amount, dedication and cost breakdown are not shown.">

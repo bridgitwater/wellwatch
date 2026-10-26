@@ -181,5 +181,24 @@ update profiles set role = 'admin' where id = '10000000-0000-0000-0000-000000000
 select pg_temp.assert(demote_admin('10000000-0000-0000-0000-000000000012') = 'ok', 'a second admin can be removed');
 select pg_temp.assert((select role from profiles where id = '10000000-0000-0000-0000-000000000012') = 'funder', 'and is now a funder');
 
+-- drive shares: only visible things are shared; admins can't reach the ledger directly ------
+select pg_temp.as_user('10000000-0000-0000-0000-000000000001');
+do $$ begin perform count(*) from drive_shares; raise exception 'ASSERT FAILED: admin read drive_shares';
+exception when insufficient_privilege then null; end $$;
+do $$ begin perform desired_drive_shares(); raise exception 'ASSERT FAILED: admin called desired_drive_shares';
+exception when insufficient_privilege then null; end $$;
+reset role; select set_config('request.jwt.claim.sub', '', true);
+insert into media (id, update_id, well_id, drive_file_id, kind, name)
+  select gen_random_uuid(), u.id, u.well_id, 'real-visible-1', 'photo', 'v.jpg' from updates u where u.status = 'published' limit 1;
+insert into media (id, update_id, well_id, drive_file_id, kind, name, hidden)
+  select gen_random_uuid(), u.id, u.well_id, 'real-hidden-1', 'photo', 'h.jpg', true from updates u where u.status = 'published' limit 1;
+select pg_temp.assert(exists (select 1 from desired_drive_shares() where file_id = 'real-visible-1' and kind = 'media'), 'visible photo is shared');
+select pg_temp.assert(not exists (select 1 from desired_drive_shares() where file_id = 'real-hidden-1'), 'hidden photo is not');
+select pg_temp.assert(not exists (select 1 from desired_drive_shares() where file_id like 'seed-%'), 'seed placeholders are ignored');
+update updates set status = 'hidden' where id = (select update_id from media where drive_file_id = 'real-visible-1');
+select pg_temp.assert(not exists (select 1 from desired_drive_shares() where file_id = 'real-visible-1'), 'a hidden update hides its photos too');
+update wells set report_file_id = 'real-report-1' where code = 'UG-2026-014';
+select pg_temp.assert(exists (select 1 from desired_drive_shares() where file_id = 'real-report-1' and kind = 'report' and folder_id is not distinct from (select drive_folder_id from wells where code = 'UG-2026-014')), 'completion report is shared, with its folder');
+
 rollback;
 \echo RLS OK

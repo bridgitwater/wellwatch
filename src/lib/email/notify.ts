@@ -5,6 +5,7 @@ import { stageLabel, type WellStage } from "../stages";
 import { fmtDateIn } from "../format";
 import type { WellType } from "../types";
 import { APP_URL, esc, layout, sendEmail } from "./send";
+import { emailFooter, unsubscribeHeaders, unsubscribeUrl } from "./unsubscribe";
 
 /** How each logged sign-in miss reads to an admin. */
 export const SIGNIN_OUTCOME: Record<string, string> = {
@@ -85,15 +86,18 @@ async function runLocked(db: ReturnType<typeof createAdminClient>, result: Notif
     const what = [photos && `${photos} new photo${photos === 1 ? "" : "s"}`, videos && `${videos} new video${videos === 1 ? "" : "s"}`].filter(Boolean).join(" and ");
     const href = `${APP_URL}/wells/${well.code}`;
     const subject = `New from ${well.name}${what ? `: ${what}` : ""}`;
-    const html = layout(`News from ${well.name}`, `${what ? `<p style="margin:0 0 12px">The team has posted ${what} from your well.</p>` : ""}${notes}`, href, "See the update");
-    const text = `News from ${well.name}\n\n${what ? `The team has posted ${what}.\n\n` : ""}${updates.filter((u) => u.body).map((u) => `${fmtDateIn(well.country, u.happened_at)}: ${u.body}`).join("\n\n")}\n\n${href}`;
+    const bodyHtml = `${what ? `<p style="margin:0 0 12px">The team has posted ${what} from your well.</p>` : ""}${notes}`;
+    const bodyText = `News from ${well.name}\n\n${what ? `The team has posted ${what}.\n\n` : ""}${updates.filter((u) => u.body).map((u) => `${fmtDateIn(well.country, u.happened_at)}: ${u.body}`).join("\n\n")}\n\n${href}`;
 
     let failed = 0;
     for (const f of (funders.data ?? []) as unknown as FRow[]) {
       // Funders hear nothing until an admin has sent their welcome email for this well.
       if (!f.welcomed_at || !f.profiles?.notify_email || alreadyToday.has(f.profile_id)) continue;
       try {
-        await sendEmail(f.profiles.email, subject, html, text);
+        // Each funder's copy carries their own unsubscribe link and one-click header.
+        const html = layout(`News from ${well.name}`, bodyHtml, href, "See the update", emailFooter(f.profile_id, "You're receiving this because you funded a well with Bridgit Water Foundation."));
+        const text = `${bodyText}\n\nUnsubscribe: ${unsubscribeUrl(f.profile_id)}`;
+        await sendEmail(f.profiles.email, subject, html, text, unsubscribeHeaders(f.profile_id));
         const logged = await db.from("notifications").insert({ profile_id: f.profile_id, well_id: wellId, kind: "new_update", meta: { updates: updates.map((u) => u.id) } });
         // Sent but not recorded: the per-day guard won't see it, so flag it rather than stay silent.
         if (logged.error) result.errors.push(`record notice ${f.profiles.email}: ${errorMessage(logged.error)}`);
@@ -148,13 +152,13 @@ async function runLocked(db: ReturnType<typeof createAdminClient>, result: Notif
         missRows.length ? `<p style="margin:${rows.length ? "16px" : "0"} 0 6px;font-weight:600">Sign-in requests that didn't get a link</p><p style="margin:0 0 6px;color:#51666f">Often a funder using a different address from the one on file, but anyone can type any address. Only link a new address after confirming with the funder through contact details you already hold, and keep the old one until they've signed in with the new.</p><ul style="padding-left:18px;margin:0">${missItems}${missMore}</ul>` : "",
       ].join("");
       const title = [rows.length && `${rows.length} update${rows.length === 1 ? "" : "s"}`, missRows.length && `${missRows.length} sign-in${missRows.length === 1 ? "" : "s"} without a link`].filter(Boolean).join(", ");
-      const html = layout(`${title} since the last digest`, sections, `${APP_URL}/admin`, "Open admin", "WellWatch admin digest, sent once a day to Bridgit admins with email updates on.");
+      const html = layout(`${title} since the last digest`, sections, `${APP_URL}/admin`, "Open admin", emailFooter(a.id, "WellWatch admin digest, sent once a day to Bridgit admins with email updates on."));
       const text = [
         ...rows.map((r) => `${r.wells?.name} (${r.wells?.code}): ${r.media.length} files${r.body ? ` — ${r.body}` : ""}`),
         ...(missRows.length ? ["", "Sign-in requests that didn't get a link:", ...missRows.map((m) => `${m.email} (${SIGNIN_OUTCOME[m.outcome] ?? m.outcome})`)] : []),
       ].join("\n");
       try {
-        await sendEmail(a.email, `WellWatch digest: ${title}`, html, text);
+        await sendEmail(a.email, `WellWatch digest: ${title}`, html, `${text}\n\nUnsubscribe: ${unsubscribeUrl(a.id)}`, unsubscribeHeaders(a.id));
         const logged = await db.from("notifications").insert({ profile_id: a.id, kind: "digest", meta: { count: rows.length, misses: missRows.length, until: now.toISOString() } });
         if (logged.error) result.errors.push(`record digest ${a.email}: ${errorMessage(logged.error)}`);
         result.digestEmails++;

@@ -1,6 +1,7 @@
 /**
- * URLs for media that lives in Google Drive. These work for files inside a
- * folder shared as "anyone with the link can view".
+ * URLs for media that lives in Google Drive. They work for files shared on their own as
+ * "anyone with the link can view", which the Drive sync does for everything funders may
+ * see (src/lib/drive/shares.ts). Well folders themselves are private.
  */
 
 export type MediaKind = "photo" | "video" | "audio" | "document";

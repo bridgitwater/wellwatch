@@ -10,15 +10,17 @@ function resend() {
 export const FROM = process.env.EMAIL_FROM ?? "WellWatch <wellwatch@bridgitwater.org>";
 export const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
-export async function sendEmail(to: string, subject: string, html: string, text: string) {
-  const { error } = await resend().emails.send({ from: FROM, to, subject, html, text });
+export async function sendEmail(to: string, subject: string, html: string, text: string, headers?: Record<string, string>) {
+  const { error } = await resend().emails.send({ from: FROM, to, subject, html, text, ...(headers ? { headers } : {}) });
   if (error) throw new Error(error.message);
 }
 
-/** Shared wrapper so every email looks like the portal. Content is plain HTML for maximum client compatibility. */
-export const FUNDER_FOOTER = `You're receiving this because you funded a well with Bridgit Water Foundation. <a href="${APP_URL}/wells" style="color:#66787f">Manage notifications</a> from your wells page.`;
-
-export function layout(title: string, bodyHtml: string, ctaHref: string, ctaLabel: string, footerHtml: string = FUNDER_FOOTER) {
+/**
+ * Shared wrapper so every email looks like the portal. Content is plain HTML for maximum
+ * client compatibility. Emails to funders pass emailFooter() (from ./unsubscribe), which
+ * carries their personal unsubscribe link.
+ */
+export function layout(title: string, bodyHtml: string, ctaHref: string, ctaLabel: string, footerHtml: string) {
   return `<!doctype html><html><body style="margin:0;background:#f4f7f8;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#16232b">
 <div style="max-width:560px;margin:0 auto;padding:32px 20px">
   <div style="font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#17607d;font-weight:600">Bridgit Water · WellWatch</div>

@@ -184,6 +184,7 @@ export default async function AdminWell({ params }: PageProps<"/admin/wells/[cod
                     <ActionForm action={sendWelcome} confirm={`Email ${f.profiles?.email ?? "this funder"} ${f.welcomed_at ? "another" : "their"} welcome and sign-in link for ${w.name}?${f.welcomed_at ? "" : " From then on they get update emails for this well."} Any earlier sign-in link they were sent stops working.`} className="flex flex-col items-end gap-1 max-w-56 text-right">
                       <input type="hidden" name="id" value={f.id} /><input type="hidden" name="code" value={w.code} />
                       <Button variant="ghost" type="submit">{f.welcomed_at ? "Resend welcome" : "Send welcome email"}</Button>
+                      <a className="text-xs text-water underline" href={`/admin/welcomes/preview?link=${f.id}`} target="_blank" rel="noreferrer">Preview email</a>
                     </ActionForm>
                     <ActionForm action={removeFunder} quiet confirm={`Remove ${f.profiles?.email ?? "this funder"} from ${w.name}? They will no longer see this well.`}><input type="hidden" name="id" value={f.id} /><input type="hidden" name="code" value={w.code} /><Button variant="danger" type="submit">Remove</Button></ActionForm>
                   </li>

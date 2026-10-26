@@ -40,10 +40,12 @@ export type DriveFile = {
    *  Interpreted in the well's country zone by the sync planner. */
   exifLocal?: string;
   durationS?: number;
+  /** Shared drives only: the item has permissions of its own, not just inherited ones. */
+  augmented?: boolean;
 };
 
 const FILE_FIELDS =
-  "nextPageToken, files(id, name, mimeType, parents, createdTime, modifiedTime, " +
+  "nextPageToken, files(id, name, mimeType, parents, createdTime, modifiedTime, hasAugmentedPermissions, " +
   "imageMediaMetadata(width, height, time), videoMediaMetadata(width, height, durationMillis))";
 
 /** Every non-trashed file and folder in the Shared Drive. */
@@ -73,6 +75,7 @@ export async function listAllInDrive(): Promise<DriveFile[]> {
         width: f.imageMediaMetadata?.width ?? f.videoMediaMetadata?.width ?? undefined,
         height: f.imageMediaMetadata?.height ?? f.videoMediaMetadata?.height ?? undefined,
         exifLocal: f.imageMediaMetadata?.time ?? undefined,
+        augmented: f.hasAugmentedPermissions ?? undefined,
         durationS: f.videoMediaMetadata?.durationMillis
           ? Math.round(Number(f.videoMediaMetadata.durationMillis) / 1000)
           : undefined,
@@ -83,8 +86,11 @@ export async function listAllInDrive(): Promise<DriveFile[]> {
   return out;
 }
 
-/** Create a well's folder at the root of the Shared Drive and make it viewable by link. */
-export async function createWellFolder(code: string, name: string, makePublic = true) {
+/**
+ * Create a well's folder at the root of the Shared Drive. Folders are private: the sync
+ * shares the individual files funders may see (src/lib/drive/shares.ts).
+ */
+export async function createWellFolder(code: string, name: string) {
   const drive = getDrive();
   const res = await drive.files.create({
     supportsAllDrives: true,
@@ -95,28 +101,5 @@ export async function createWellFolder(code: string, name: string, makePublic = 
     },
     fields: "id",
   });
-  const id = res.data.id!;
-  if (makePublic) await setFolderPublic(id, true);
-  return id;
-}
-
-export async function setFolderPublic(folderId: string, isPublic: boolean) {
-  const drive = getDrive();
-  if (isPublic) {
-    await drive.permissions.create({
-      fileId: folderId,
-      supportsAllDrives: true,
-      requestBody: { type: "anyone", role: "reader", allowFileDiscovery: false },
-    });
-  } else {
-    const perms = await drive.permissions.list({
-      fileId: folderId,
-      supportsAllDrives: true,
-      fields: "permissions(id, type)",
-    });
-    for (const p of perms.data.permissions ?? []) {
-      if (p.type === "anyone" && p.id)
-        await drive.permissions.delete({ fileId: folderId, permissionId: p.id, supportsAllDrives: true });
-    }
-  }
+  return res.data.id!;
 }

@@ -10,7 +10,10 @@ import { STAGE_ORDER, type WellStage } from "../stages";
 import { requireAdmin } from "./guard";
 import { ensureFunderProfile } from "./funders";
 import { emailSchema } from "../email-address";
-import { sendFunderWelcome } from "../email/welcome";
+import { sendFunderWelcome, sendWelcomes } from "../email/welcome";
+import { applyShares, driveConfigured, makeFoldersPrivate } from "../drive/shares";
+import { listAllInDrive, sharedDriveId } from "../drive/client";
+import { createAdminClient } from "../supabase/admin";
 import { countryTimeZone, exifLocalToIso, tzOffsetMinutes } from "../timezones";
 
 export type ActionResult = { ok: true; message?: string } | { ok: false; error: string };
@@ -19,6 +22,26 @@ const str = (max = 500) => z.string().trim().max(max);
 const optStr = (max = 500) => str(max).transform((s) => (s === "" ? null : s)).nullable().optional();
 const optNum = z.preprocess((v) => (v === "" || v == null ? null : Number(v)), z.number().nullable());
 const optDate = z.preprocess((v) => (v === "" || v == null ? null : v), z.string().date().nullable());
+
+/**
+ * After hiding or showing photos (or setting a report, testimonial photo or logo), update
+ * Drive links straight away instead of waiting for the 10-minute sync. Best effort: the
+ * sync retries anything that fails. Returns a note for the admin when it isn't done yet.
+ */
+async function applySharingNow(fileIds: (string | null | undefined)[]): Promise<string | null> {
+  const ids = fileIds.filter((x): x is string => !!x);
+  if (!ids.length || !driveConfigured()) return null;
+  try {
+    return await applyShares(createAdminClient(), ids);
+  } catch {
+    return "Saved. Drive hasn't caught up yet; WellWatch will retry within 10 minutes.";
+  }
+}
+
+async function fileIdsOfUpdate(updateId: string): Promise<string[]> {
+  const { data } = await createAdminClient().from("media").select("drive_file_id").eq("update_id", updateId);
+  return (data ?? []).map((m) => m.drive_file_id);
+}
 
 function fields(fd: FormData) {
   return Object.fromEntries(fd.entries());
@@ -106,7 +129,7 @@ export async function createWell(_prev: ActionResult | null, fd: FormData): Prom
   // Drive folder, if Drive is configured. Failure here shouldn't block the well.
   if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON_B64 && process.env.DRIVE_SHARED_DRIVE_ID) {
     try {
-      const folderId = await createWellFolder(data.code, data.name, parsed.data.folder_is_public);
+      const folderId = await createWellFolder(data.code, data.name);
       await supabase.from("wells").update({ drive_folder_id: folderId }).eq("id", data.id);
     } catch (e) {
       console.error("Drive folder creation failed", e);
@@ -127,7 +150,8 @@ export async function updateWell(_prev: ActionResult | null, fd: FormData): Prom
   if (error) return fail(error);
   revalidatePath(`/admin/wells/${parsed.data.code}`);
   revalidatePath(`/wells/${parsed.data.code}`);
-  return { ok: true, message: "Saved" };
+  const note = await applySharingNow([parsed.data.report_file_id]);
+  return { ok: true, message: note ?? "Saved" };
 }
 
 // ---------------------------------------------------------------------------
@@ -247,7 +271,9 @@ export async function saveUpdate(_prev: ActionResult | null, fd: FormData): Prom
   revalidatePath(`/admin/wells/${code}`);
   revalidatePath(`/wells/${code}`);
   revalidatePath("/admin");
-  return result(error, "Saved");
+  if (error) return result(error);
+  const note = await applySharingNow(await fileIdsOfUpdate(id));
+  return note ? { ok: true, message: note } : result(null, "Saved");
 }
 
 export async function toggleUpdateHidden(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
@@ -259,7 +285,9 @@ export async function toggleUpdateHidden(_prev: ActionResult | null, fd: FormDat
   revalidatePath("/admin");
   revalidatePath(`/admin/wells/${String(fd.get("code"))}`);
   revalidatePath(`/wells/${String(fd.get("code"))}`);
-  return result(error);
+  if (error) return result(error);
+  const note = await applySharingNow(await fileIdsOfUpdate(id));
+  return note ? { ok: true, message: note } : result(null);
 }
 
 export async function toggleMediaHidden(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
@@ -267,10 +295,12 @@ export async function toggleMediaHidden(_prev: ActionResult | null, fd: FormData
   const id = String(fd.get("id"));
   const hide = fd.get("hide") === "1";
   const supabase = await createClient();
-  const { error } = await supabase.from("media").update({ hidden: hide }).eq("id", id);
+  const { data: m, error } = await supabase.from("media").update({ hidden: hide }).eq("id", id).select("drive_file_id").maybeSingle();
   revalidatePath(`/admin/wells/${String(fd.get("code"))}`);
   revalidatePath(`/wells/${String(fd.get("code"))}`);
-  return result(error);
+  if (error) return result(error);
+  const note = await applySharingNow(m ? [m.drive_file_id] : []);
+  return note ? { ok: true, message: note } : result(null);
 }
 
 export async function setMediaTag(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
@@ -308,7 +338,8 @@ export async function addTestimonial(_prev: ActionResult | null, fd: FormData): 
   if (error) return fail(error);
   revalidatePath(`/admin/wells/${code}`);
   revalidatePath(`/wells/${code}`);
-  return { ok: true, message: "Added" };
+  const note = await applySharingNow([row.photo_file_id]);
+  return { ok: true, message: note ?? "Added" };
 }
 
 export async function deleteTestimonial(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
@@ -426,5 +457,63 @@ export async function updateOrganization(_prev: ActionResult | null, fd: FormDat
   const { error } = await supabase.from("organizations").update(row).eq("id", id);
   if (error) return fail(error);
   revalidatePath("/admin/partners");
-  return { ok: true, message: "Saved" };
+  const note = await applySharingNow([row.logo_file_id]);
+  return { ok: true, message: note ?? "Saved" };
+}
+
+// ---------------------------------------------------------------------------
+// Bulk welcomes
+// ---------------------------------------------------------------------------
+const BULK_LIMIT = 25;
+
+/**
+ * Welcomes the chosen funders: one email each, covering every well of theirs that
+ * hasn't been welcomed yet. At most 25 funders a go, sent one at a time.
+ */
+export async function sendBulkWelcomes(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  await requireAdmin();
+  const funders = [...new Set(fd.getAll("funder").map(String))].filter((v) => /^[0-9a-f-]{36}$/i.test(v));
+  if (!funders.length) return { ok: false, error: "Tick at least one funder." };
+  if (funders.length > BULK_LIMIT) return { ok: false, error: `That's ${funders.length} funders. Send at most ${BULK_LIMIT} at a time.` };
+
+  const db = createAdminClient();
+  const { data: links, error } = await db.from("well_funders").select("id").in("profile_id", funders).is("welcomed_at", null);
+  if (error) return fail(error);
+  if (!links?.length) return { ok: false, error: "Those funders have all been welcomed already." };
+
+  const results = await sendWelcomes(links.map((l) => l.id));
+  revalidatePath("/admin/welcomes");
+  revalidatePath("/admin/wells", "layout");
+  const sent = results.filter((r) => r.ok);
+  const failed = results.filter((r) => !r.ok);
+  const summary = `Sent ${sent.length} welcome email${sent.length === 1 ? "" : "s"} (${sent.reduce((n, r) => n + r.wells, 0)} wells).`;
+  if (!failed.length) return { ok: true, message: summary };
+  return { ok: false, error: `${summary} Not sent: ${failed.map((f) => `${f.email} (${f.error})`).join("; ")}` };
+}
+
+// ---------------------------------------------------------------------------
+// Drive privacy
+// ---------------------------------------------------------------------------
+/** Phase 2 of private folders: see makeFoldersPrivate in src/lib/drive/shares.ts. */
+export async function makeDriveFoldersPrivate(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  await requireAdmin();
+  if (!driveConfigured()) return { ok: false, error: "Drive isn't connected on this server." };
+  // "Try one folder first" sends max=1, so the result can be checked before doing the rest.
+  const max = fd.get("max") === "1" ? 1 : Infinity;
+  try {
+    const r = await makeFoldersPrivate(createAdminClient(), await listAllInDrive(), sharedDriveId(), undefined, undefined, max);
+    if (max === 1 && r.madePrivate.length) {
+      revalidatePath("/admin");
+      return { ok: true, message: `Made "${r.madePrivate[0]}" private. Check its well page still shows its photos, then make the rest private.` };
+    }
+    revalidatePath("/admin");
+    const parts = [
+      r.madePrivate.length ? `${r.madePrivate.length} folder${r.madePrivate.length === 1 ? "" : "s"} made private.` : "No folders changed.",
+      r.skipped.length ? `Waiting: ${r.skipped.join("; ")}.` : "",
+      r.errors.length ? `Problems: ${r.errors.join("; ")}.` : "",
+    ].filter(Boolean).join(" ");
+    return r.errors.length ? { ok: false, error: parts } : { ok: true, message: parts };
+  } catch (e) {
+    return fail(e);
+  }
 }

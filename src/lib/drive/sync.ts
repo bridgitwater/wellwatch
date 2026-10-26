@@ -1,5 +1,6 @@
 import { createAdminClient, errorMessage, selectAll } from "../supabase/admin";
 import { listAllInDrive, sharedDriveId } from "./client";
+import { reconcileShares, type ShareResult } from "./shares";
 import { planSync, type DbMedia, type DbUpdate, type DbWell, type SyncPlan } from "./plan";
 
 export type SyncResult = {
@@ -10,6 +11,7 @@ export type SyncResult = {
   renamed: number;
   deleted: number;
   unmatchedFolders: string[];
+  shares?: ShareResult;
   error?: string;
 };
 
@@ -35,12 +37,18 @@ export async function runDriveSync(): Promise<SyncResult> {
 
     const counts = await applyPlan(db, plan);
 
+    // Then make Drive's sharing match: only what funders may see is viewable by link,
+    // and well folders are private. Problems here don't fail the sync; they're shown
+    // on the admin dashboard and retried next run.
+    const shares = await reconcileShares(db, files, sharedDriveId());
+    const shareError = shares.errors.length ? `Sharing: ${shares.errors.slice(0, 3).join("; ")}${shares.errors.length > 3 ? ` (+${shares.errors.length - 3} more)` : ""}` : null;
+
     await db
       .from("drive_sync_state")
-      .update({ last_synced_at: new Date().toISOString(), last_error: null })
+      .update({ last_synced_at: new Date().toISOString(), last_error: shareError })
       .eq("id", 1);
 
-    return { ok: true, ...counts, unmatchedFolders: plan.unmatchedFolders.map((f) => f.name) };
+    return { ok: true, ...counts, unmatchedFolders: plan.unmatchedFolders.map((f) => f.name), shares };
   } catch (e) {
     const msg = errorMessage(e);
     console.error("drive-sync failed:", msg);

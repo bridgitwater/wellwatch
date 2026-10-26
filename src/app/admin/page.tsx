@@ -3,6 +3,7 @@ import { toggleUpdateHidden } from "@/lib/admin/actions";
 import { Button, Card } from "@/components/admin/ui";
 import { ActionForm } from "@/components/admin/action-form";
 import { LocalTime } from "@/components/local-time";
+import { DrivePrivacyCard } from "@/components/admin/drive-privacy";
 import { DriveImage } from "@/components/drive-image";
 import { fmtRelative } from "@/lib/format";
 import { STAGE_LABEL, STAGE_ORDER, type WellStage } from "@/lib/stages";
@@ -85,6 +86,7 @@ export default async function AdminHome() {
             </li>
           </ul>
         </Card>
+        <DrivePrivacyCard />
         <Card title="Drive sync">
           <dl className="text-sm flex flex-col gap-1">
             <div className="flex justify-between"><dt className="text-ink-2">Last run</dt><dd>{sync.data?.last_synced_at ? fmtRelative(sync.data.last_synced_at) : "never"}</dd></div>
