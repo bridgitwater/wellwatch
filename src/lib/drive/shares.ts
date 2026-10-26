@@ -264,11 +264,17 @@ export async function makeFoldersPrivate(db: Db, files: DriveFile[], rootId: str
       for (const d of inside) if (!(await ops.directLink(d.file_id))) unready.push(d.file_id);
       if (unready.length) { out.skipped.push(`${folder.name}: ${unready.length} file(s) not yet shared on their own; the next sync will do it`); continue; }
       await ops.unshare(folder.id);
+      const broken: string[] = [];
       for (const d of inside) {
-        if (!(await ops.directLink(d.file_id))) {
-          await shareVerified(ctx, d, d.kind);
-          out.errors.push(`${folder.name}: a file lost its link when the folder went private, and was shared again`);
-        }
+        if (await ops.directLink(d.file_id)) continue;
+        await shareVerified(ctx, d, d.kind);
+        if (!(await ops.directLink(d.file_id))) broken.push(d.file_id);
+      }
+      if (broken.length) {
+        // Something funders see would break: put the folder's link back and stop here.
+        await ops.share(folder.id);
+        out.errors.push(`${folder.name}: ${broken.length} file(s) lost their link when the folder went private, so the folder was shared again. Nothing changed for funders.`);
+        continue;
       }
       await record(ctx, folder.id, "folder", false, false, null);
       out.madePrivate.push(folder.name);

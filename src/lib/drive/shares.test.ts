@@ -147,6 +147,23 @@ describe("phase 2: making folders private (admin button)", () => {
     expect(drive.own.size).toBe(1);
   });
 
+  it("puts the folder's link back if a file would break and can't be re-shared", async () => {
+    const db = fakeDb([want("a")]);
+    // A Drive where the file's link only came from the folder, and sharing the file doesn't stick.
+    let folderShared = true; const log: string[] = [];
+    const ops: DriveOps = {
+      async share(id) { log.push(`share ${id}`); if (id === "F1") folderShared = true; },
+      async directLink(id) { return id === "a" ? folderShared : false; },
+      async unshare(id) { log.push(`unshare ${id}`); if (id === "F1") folderShared = false; },
+    };
+    // @ts-expect-error fake client
+    const r = await makeFoldersPrivate(db, [folder("F1"), file("a", "F1")], ROOT, ops);
+    expect(r.madePrivate).toEqual([]);
+    expect(folderShared).toBe(true);
+    expect(r.errors.join()).toMatch(/shared again\. Nothing changed for funders/);
+    expect(db.table.get("F1")).toBeUndefined();
+  });
+
   it("finds files by where they really are, including subfolders", async () => {
     const db = fakeDb([want("deep", "WRONG")]);
     const drive = fakeDrive(["F1"]);
