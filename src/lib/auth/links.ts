@@ -12,6 +12,9 @@ import { APP_URL } from "../email/send";
  * replaces the person's previous one. Refuses emails that aren't on file, so it
  * can never create an account.
  */
+/** How long a sign-in link lasts, for email copy. Keep in step with Supabase → Auth → Email OTP expiry. */
+export const LINK_LIFETIME = "one hour";
+
 export async function signInLink(email: string, next: string): Promise<string> {
   const admin = createAdminClient();
   const { data: profile, error: findErr } = await admin.from("profiles").select("id").eq("email", email.toLowerCase()).maybeSingle();

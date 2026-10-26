@@ -1,9 +1,11 @@
 import { ActionForm } from "@/components/admin/action-form";
-import { Button, Card, Field, Input } from "@/components/admin/ui";
+import { Button, Card } from "@/components/admin/ui";
 import { LocalTime } from "@/components/local-time";
 import { requireAdmin } from "@/lib/admin/guard";
-import { addTeamMember, removeTeamMember, resendTeamLink } from "@/lib/admin/team-actions";
+import { removeTeamMember, resendTeamLink } from "@/lib/admin/team-actions";
 import { SIGNIN_OUTCOME } from "@/lib/email/notify";
+import { LINK_LIFETIME } from "@/lib/auth/links";
+import { AddAdminForm } from "@/components/admin/add-admin-form";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -70,7 +72,7 @@ export default async function TeamPage() {
             <>
               <p className="text-sm text-ink-2 mb-3">
                 The sign-in page always says a link is on its way, so strangers can&apos;t test which emails we hold. These are the requests where nothing was sent.
-                Most are funders using a different email from the one on file: link the email they used to their well (and remove the old one), then ask them to try again.
+                Often it&apos;s a funder using a different address from the one on file, but anyone can type any address here. Only link a new address to a well after confirming with the funder through contact details you already hold, and keep the old address until they&apos;ve signed in with the new one.
               </p>
               <ul className="flex flex-col divide-y divide-line text-sm">
                 {(misses.data ?? []).map((m) => (
@@ -86,13 +88,9 @@ export default async function TeamPage() {
       </div>
 
       <Card title="Add an admin">
-        <ActionForm action={addTeamMember} resetOnSuccess className="flex flex-col gap-3">
-          <Field label="Email"><Input name="email" type="email" required placeholder="name@bridgitwater.org" /></Field>
-          <Field label="Name" hint="Used to greet them."><Input name="display_name" placeholder="Carla Martinez" /></Field>
-          <Button type="submit">Add and send welcome email</Button>
-        </ActionForm>
+        <AddAdminForm />
         <p className="text-xs text-ink-3 mt-4">
-          Admins can see and edit every well, funder and partner. They get a welcome email with a sign-in link that works for an hour; after that they sign in at the
+          Admins can see and edit every well, funder and partner. They get a welcome email with a sign-in link that works for {LINK_LIFETIME}; after that they sign in at the
           normal sign-in page with this email. No passwords.
         </p>
       </Card>

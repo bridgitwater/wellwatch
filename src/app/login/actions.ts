@@ -1,73 +1,67 @@
 "use server";
 
 import { z } from "zod";
-import { createClient } from "@supabase/supabase-js";
-import { safeNext } from "@/lib/safe-next";
 import { after } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { headers } from "next/headers";
+import { safeNext } from "@/lib/safe-next";
+import { emailSchema } from "@/lib/email-address";
+import { createAdminClient, errorMessage } from "@/lib/supabase/admin";
+import { sendSignInEmail } from "@/lib/email/signin";
 
 export type LoginState = { status: "idle" } | { status: "sent"; email: string } | { status: "error"; message: string };
 
 const schema = z.object({
-  email: z.string().trim().toLowerCase().email("Enter a valid email address"),
+  email: emailSchema,
   // Same-origin path only: "//evil.example" passes startsWith("/") but is an open redirect.
   next: z.unknown().transform((v) => safeNext(v)),
 });
 
+/**
+ * Emails a sign-in link to people on file. Everyone is told "a link is on its way",
+ * so strangers can't learn which emails we hold; the response does the same work
+ * (one profile lookup, one limiter call) whether or not the email is on file, and
+ * the link itself is made and sent after the response. Requests that send nothing
+ * are logged for admins (daily digest, Team page).
+ *
+ * WellWatch sends this email itself rather than through Supabase Auth: Supabase's
+ * project-wide allowance (30 an hour) could be used up by anyone, locking every
+ * funder out, and its links sign in on a plain GET, which mail scanners burn.
+ */
 export async function sendMagicLink(_prev: LoginState, formData: FormData): Promise<LoginState> {
   const parsed = schema.safeParse({ email: formData.get("email"), next: formData.get("next") });
   if (!parsed.success) return { status: "error", message: parsed.error.issues[0]?.message ?? "Invalid input" };
-
   const { email, next } = parsed.data;
-  // Implicit flow (not PKCE): the emailed link must work from ANY browser or device,
-  // not only the one that requested it. NB: @supabase/ssr's createServerClient
-  // silently forces flowType "pkce", so this must be a plain supabase-js client.
-  // The session lands in the URL fragment and /auth/complete turns it into cookies.
-  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
-    auth: { flowType: "implicit", persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-  });
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
-  const send = () => supabase.auth.signInWithOtp({
-    email,
-    options: {
-      // Only people the admin has invited can sign in; strangers get the same
-      // "check your email" message but no account is created.
-      shouldCreateUser: false,
-      // Straight to the client-side completer: the session arrives in the URL
-      // fragment, so a server hop via /auth/callback would only add a redirect.
-      emailRedirectTo: `${appUrl}/auth/complete?next=${encodeURIComponent(next)}`,
-    },
-  });
+  const h = await headers();
+  const ip = h.get("x-real-ip") ?? h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
 
-  let { error } = await send();
+  try {
+    const admin = createAdminClient();
+    const { data: profile, error: findErr } = await admin.from("profiles").select("id").eq("email", email).maybeSingle();
+    if (findErr) throw findErr;
+    const { data: verdict, error: limitErr } = await admin.rpc("signin_allow", { p_email: email, p_ip: ip, p_on_file: Boolean(profile) });
+    if (limitErr) throw limitErr;
 
-  // An invited-but-never-confirmed user (e.g. someone added with Supabase's
-  // "Invite user" who never clicked the invite in time) is treated by Supabase
-  // as a new signup, and signups are disabled, so no link is ever sent. If an
-  // admin has put this person on file, confirm their email and try again.
-  if (error && (error as { code?: string }).code === "signup_disabled") {
-    if (await confirmInvitedUser(email)) ({ error } = await send());
-  }
-
-  // Don't reveal whether an email is on file; treat "user not found" as sent.
-  // Admins still see every request that sent no link (daily digest, Team page).
-  // Logging runs after the response so it adds no delay to these paths.
-  if (error && /only request this after/i.test(error.message)) {
-    // Per-person cooldown: a link went to this address under a minute ago. Say "sent" like
-    // any other request (an error here would reveal the email is on file) and log nothing.
-    return { status: "sent", email };
-  }
-  if (error && !/not\s*found|signups?\s*not\s*allowed/i.test(error.message)) {
-    const detail = error.message;
-    if (/rate limit/i.test(detail)) {
-      after(() => logMiss(email, "rate_limited", detail));
-      return { status: "error", message: "Too many sign-in emails were requested recently. Please wait a little while and try again." };
+    if (verdict === "ok") {
+      after(async () => {
+        try {
+          await sendSignInEmail(email, next);
+        } catch (e) {
+          await logMiss(email, "error", errorMessage(e));
+        }
+      });
+    } else if (verdict === "not_on_file") {
+      after(() => logMiss(email, "not_on_file", null));
+    } else if (verdict !== "email_cooldown") {
+      // email_cooldown: a link went out under a minute ago and a new one would cancel it. Nothing to report.
+      after(() => logMiss(email, "rate_limited", String(verdict)));
     }
+  } catch (e) {
+    // Only reached when WellWatch's own database is unreachable, for any email alike.
+    const detail = errorMessage(e);
     after(() => logMiss(email, "error", detail));
     return { status: "error", message: "We couldn't send the link just now. Please try again in a minute." };
   }
-  if (error) after(() => logMiss(email, "not_on_file", null));
   return { status: "sent", email };
 }
 
@@ -86,23 +80,5 @@ async function logMiss(email: string, outcome: "not_on_file" | "rate_limited" | 
     if (error) console.error("login: could not log sign-in miss", error.message);
   } catch (e) {
     console.error("login: could not log sign-in miss", e);
-  }
-}
-
-/** Confirms the email of an existing, unconfirmed auth user who has a profile. Returns true if it did. */
-async function confirmInvitedUser(email: string): Promise<boolean> {
-  try {
-    const admin = createAdminClient();
-    const { data: profile } = await admin.from("profiles").select("id").eq("email", email).maybeSingle();
-    if (!profile) return false;
-    const { error } = await admin.auth.admin.updateUserById(profile.id, { email_confirm: true });
-    if (error) {
-      console.error("login: could not confirm invited user", error.message);
-      return false;
-    }
-    return true;
-  } catch (e) {
-    console.error("login: confirmInvitedUser failed", e);
-    return false;
   }
 }

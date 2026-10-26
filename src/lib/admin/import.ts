@@ -8,6 +8,7 @@ import type { ActionResult } from "./actions";
 import { ensureFunderProfile } from "./funders";
 import { parseCsv } from "./csv";
 import { requireAdmin } from "./guard";
+import { emailSchema } from "../email-address";
 
 export type ImportResult = ActionResult & { imported?: number; skipped?: string[] };
 
@@ -87,9 +88,11 @@ export async function importFundersCsv(_prev: ImportResult | null, fd: FormData)
   const skipped: string[] = [];
   for (const r of rows) {
     const wellId = wellByCode.get(r.well_code.toUpperCase());
-    const email = r.email.toLowerCase();
+    const checked = emailSchema.safeParse(r.email ?? "");
+    const email = checked.success ? checked.data : (r.email ?? "").trim();
     if (!wellId) { skipped.push(`${email}: no well ${r.well_code}`); continue; }
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { skipped.push(`${r.email}: bad email`); continue; }
+    // Same rule as the sign-in page, so nobody is imported who could never sign in.
+    if (!checked.success) { skipped.push(`${email}: not an email address WellWatch can sign in with`); continue; }
     try {
       const profileId = await ensureFunderProfile(email, r.display_name || null);
       const { error } = await supabase.from("well_funders").upsert(

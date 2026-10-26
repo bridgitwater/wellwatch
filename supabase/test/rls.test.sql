@@ -143,5 +143,43 @@ do $$ begin
   perform pg_temp.assert(not exists (select 1 from well_funders where profile_id = auth.uid() and welcomed_at > now() - interval '1 minute'), 'funder cannot stamp their own welcomed_at');
 end $$;
 
+-- 27 Oct hardening: service-role-only objects ---------------------------------------
+select pg_temp.as_user('10000000-0000-0000-0000-000000000001');  -- even an admin, via the API
+do $$ begin perform count(*) from signin_requests; raise exception 'ASSERT FAILED: admin read signin_requests';
+exception when insufficient_privilege then null; end $$;
+do $$ begin perform signin_allow('x@example.com', '1.2.3.4', true); raise exception 'ASSERT FAILED: admin called signin_allow';
+exception when insufficient_privilege then null; end $$;
+do $$ begin perform demote_admin('10000000-0000-0000-0000-000000000001'); raise exception 'ASSERT FAILED: admin called demote_admin directly';
+exception when insufficient_privilege then null; end $$;
+do $$ begin perform job_try_lock('notify', 60); raise exception 'ASSERT FAILED: admin called job_try_lock';
+exception when insufficient_privilege then null; end $$;
+reset role; select set_config('request.jwt.claim.sub', '', true);
+
+-- signin_allow: on-file cooldown, hourly cap, per-IP cap; strangers never "ok"
+select pg_temp.assert(signin_allow('nobody@example.com', '9.9.9.9', false) = 'not_on_file', 'stranger -> not_on_file');
+select pg_temp.assert(signin_allow('funder.one@example.com', '9.9.9.1', true) = 'ok', 'first request ok');
+select pg_temp.assert(signin_allow('funder.one@example.com', '9.9.9.1', true) = 'email_cooldown', 'second within a minute -> cooldown');
+update signin_requests set created_at = created_at - interval '2 minutes' where email = 'funder.one@example.com';
+select pg_temp.assert(signin_allow('funder.one@example.com', '9.9.9.1', true) = 'ok', 'after the cooldown -> ok');
+insert into signin_requests (email, ip, sent, created_at) select 'funder.one@example.com', '9.9.9.1', true, now() - interval '10 minutes' from generate_series(1, 1);
+update signin_requests set created_at = created_at - interval '2 minutes' where email = 'funder.one@example.com' and created_at > now() - interval '1 minute';
+select pg_temp.assert(signin_allow('funder.one@example.com', '9.9.9.1', true) = 'email_hourly', '3 sent in an hour -> email_hourly');
+insert into signin_requests (email, ip, sent) select 'ghost' || g || '@example.com', '6.6.6.6', false from generate_series(1, 30) g;
+select pg_temp.assert(signin_allow('funder.two@example.com', '6.6.6.6', true) = 'ip_hourly', '30 requests from one IP -> ip_hourly');
+select pg_temp.assert(signin_allow('funder.two@example.com', '7.7.7.7', true) = 'ok', 'but another IP still works');
+
+-- job lock: one holder at a time; free again after unlock
+select pg_temp.assert(job_try_lock('t', 60), 'first lock taken');
+select pg_temp.assert(not job_try_lock('t', 60), 'second lock refused');
+select job_unlock('t');
+select pg_temp.assert(job_try_lock('t', 60), 'free again after unlock');
+
+-- demote_admin: never removes the last admin
+select pg_temp.assert(demote_admin('10000000-0000-0000-0000-000000000011') = 'not_admin', 'funder is not an admin');
+select pg_temp.assert(demote_admin('10000000-0000-0000-0000-000000000001') = 'last_admin', 'the only admin stays');
+update profiles set role = 'admin' where id = '10000000-0000-0000-0000-000000000012';
+select pg_temp.assert(demote_admin('10000000-0000-0000-0000-000000000012') = 'ok', 'a second admin can be removed');
+select pg_temp.assert((select role from profiles where id = '10000000-0000-0000-0000-000000000012') = 'funder', 'and is now a funder');
+
 rollback;
 \echo RLS OK

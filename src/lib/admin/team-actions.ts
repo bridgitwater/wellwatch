@@ -3,12 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createAdminClient, errorMessage } from "../supabase/admin";
+import { emailSchema } from "../email-address";
+import { createAccount, profileIdFor } from "./funders";
 import { sendTeamWelcome } from "../email/welcome";
 import { requireAdmin } from "./guard";
 import type { ActionResult } from "./actions";
 
 const memberSchema = z.object({
-  email: z.string().trim().toLowerCase().email("Enter a valid email"),
+  email: emailSchema,
   display_name: z.string().trim().max(120).transform((s) => (s === "" ? null : s)),
 });
 
@@ -26,25 +28,20 @@ export async function addTeamMember(_prev: ActionResult | null, fd: FormData): P
   const db = createAdminClient();
 
   try {
-    const { data: existing, error: findErr } = await db.from("profiles").select("id, role, display_name").eq("email", email).maybeSingle();
+    const { data: existing, error: findErr } = await db.from("profiles").select("id, role").eq("email", email).maybeSingle();
     if (findErr) throw findErr;
     if (existing?.role === "admin") return { ok: false, error: `${email} is already an admin. Use “Send sign-in link” if they need a new link.` };
 
-    if (existing) {
-      const patch: { role: "admin"; display_name?: string } = { role: "admin" };
-      if (display_name && !existing.display_name) patch.display_name = display_name;
-      const { error } = await db.from("profiles").update(patch).eq("id", existing.id);
-      if (error) throw error;
-      const { error: confirmErr } = await db.auth.admin.updateUserById(existing.id, { email_confirm: true });
-      if (confirmErr) throw confirmErr;
-    } else {
-      const { error } = await db.auth.admin.createUser({
-        email,
-        email_confirm: true,
-        user_metadata: { display_name: display_name ?? undefined, role: "admin" },
-      });
-      if (error) throw error;
-    }
+    // Create the account if needed (safe if another admin is adding the same person right now),
+    // confirm it, then raise the role. The role is set here, never read from sign-up metadata.
+    const id = existing?.id ?? (await profileIdFor(db, email)) ?? (await createAccount(db, email, display_name));
+    const { error: confirmErr } = await db.auth.admin.updateUserById(id, { email_confirm: true });
+    if (confirmErr) throw confirmErr;
+    const patch: { role: "admin"; display_name?: string } = { role: "admin" };
+    if (display_name) patch.display_name = display_name;
+    const { data: raised, error } = await db.from("profiles").update(patch).eq("id", id).neq("role", "admin").select("id");
+    if (error) throw error;
+    if (!raised?.length) return { ok: false, error: `${email} was made an admin a moment ago (by another admin?). Check the list.` };
   } catch (e) {
     return { ok: false, error: errorMessage(e) };
   }
@@ -79,9 +76,11 @@ export async function removeTeamMember(_prev: ActionResult | null, fd: FormData)
   const id = String(fd.get("id") ?? "");
   if (id === me.id) return { ok: false, error: "You can't remove your own admin access." };
   const db = createAdminClient();
-  const { data, error } = await db.from("profiles").update({ role: "funder" }).eq("id", id).eq("role", "admin").select("email");
+  // demote_admin() locks the admin list, so two admins removing each other at once can't leave nobody.
+  const { data: verdict, error } = await db.rpc("demote_admin", { p_target: id });
   if (error) return { ok: false, error: errorMessage(error) };
-  if (!data?.length) return { ok: false, error: "That person isn't an admin any more." };
   revalidatePath("/admin/team");
-  return { ok: true, message: `Admin access removed for ${data[0].email}` };
+  if (verdict === "not_admin") return { ok: false, error: "That person isn't an admin any more." };
+  if (verdict === "last_admin") return { ok: false, error: "WellWatch needs at least one admin, so this one stays." };
+  return { ok: true, message: "Admin access removed" };
 }

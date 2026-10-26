@@ -13,7 +13,7 @@ export const SIGNIN_OUTCOME: Record<string, string> = {
   error: "sending failed",
 };
 
-export type NotifyResult = { funderEmails: number; digestEmails: number; errors: string[] };
+export type NotifyResult = { funderEmails: number; digestEmails: number; errors: string[]; skipped?: string };
 
 /**
  * Sends the emails that are due:
@@ -22,12 +22,27 @@ export type NotifyResult = { funderEmails: number; digestEmails: number; errors:
  *
  * An update is marked notified once every due email for its well was sent; if any send (or the
  * funder lookup) fails the update stays due and is retried next hour (the per-funder-per-day
- * guard stops duplicates). Funders who haven't been sent their welcome email are skipped, so
- * they never hear about updates posted before their welcome; the welcome links to the well.
+ * guard stops duplicates). Funders who haven't been sent their welcome email are skipped; once
+ * welcomed, they hear about updates that are still due (posted in the last couple of hours, or
+ * left due by a failed send), and older ones are on the well page the welcome links to.
+ *
+ * Only one run at a time: an overlapping run (the hourly schedule plus a manual run, say)
+ * would otherwise read "nothing sent yet" alongside this one and email everyone twice.
  */
 export async function runNotifications(): Promise<NotifyResult> {
   const db = createAdminClient();
   const result: NotifyResult = { funderEmails: 0, digestEmails: 0, errors: [] };
+  const { data: locked, error: lockErr } = await db.rpc("job_try_lock", { p_name: "notify", p_seconds: 600 });
+  if (lockErr) result.errors.push(`lock: ${errorMessage(lockErr)} (running without it)`);
+  else if (!locked) return { ...result, skipped: "another run is in progress" };
+  try {
+    return await runLocked(db, result);
+  } finally {
+    if (locked) await db.rpc("job_unlock", { p_name: "notify" });
+  }
+}
+
+async function runLocked(db: ReturnType<typeof createAdminClient>, result: NotifyResult): Promise<NotifyResult> {
   const now = new Date();
 
   // ---- Funder notices -------------------------------------------------------
@@ -130,7 +145,7 @@ export async function runNotifications(): Promise<NotifyResult> {
       const missItems = missRows.map((m) => `<li>${esc(m.email)} <span style="color:#66787f">· ${esc(SIGNIN_OUTCOME[m.outcome] ?? m.outcome)}</span></li>`).join("");
       const sections = [
         rows.length ? `<ul style="padding-left:18px;margin:0">${items}</ul>` : "",
-        missRows.length ? `<p style="margin:${rows.length ? "16px" : "0"} 0 6px;font-weight:600">Sign-in requests that didn't get a link</p><p style="margin:0 0 6px;color:#51666f">Usually a funder using a different email from the one on file. Link the email they used to their well, then remove the old one.</p><ul style="padding-left:18px;margin:0">${missItems}${missMore}</ul>` : "",
+        missRows.length ? `<p style="margin:${rows.length ? "16px" : "0"} 0 6px;font-weight:600">Sign-in requests that didn't get a link</p><p style="margin:0 0 6px;color:#51666f">Often a funder using a different address from the one on file, but anyone can type any address. Only link a new address after confirming with the funder through contact details you already hold, and keep the old one until they've signed in with the new.</p><ul style="padding-left:18px;margin:0">${missItems}${missMore}</ul>` : "",
       ].join("");
       const title = [rows.length && `${rows.length} update${rows.length === 1 ? "" : "s"}`, missRows.length && `${missRows.length} sign-in${missRows.length === 1 ? "" : "s"} without a link`].filter(Boolean).join(", ");
       const html = layout(`${title} since the last digest`, sections, `${APP_URL}/admin`, "Open admin", "WellWatch admin digest, sent once a day to Bridgit admins with email updates on.");
@@ -149,11 +164,14 @@ export async function runNotifications(): Promise<NotifyResult> {
     }
   }
 
-  // Sign-in misses hold strangers' email addresses; keep them 90 days only.
+  // Sign-in records hold strangers' email addresses: misses kept 90 days, the limiter's ledger 7.
   if (now.getUTCHours() === 20) {
     const cutoff = new Date(now.getTime() - 90 * 24 * 3600 * 1000).toISOString();
     const { error } = await db.from("signin_attempts").delete().lt("created_at", cutoff);
     if (error) result.errors.push(`signin_attempts retention: ${errorMessage(error)}`);
+    const week = new Date(now.getTime() - 7 * 24 * 3600 * 1000).toISOString();
+    const { error: e2 } = await db.from("signin_requests").delete().lt("created_at", week);
+    if (e2) result.errors.push(`signin_requests retention: ${errorMessage(e2)}`);
   }
 
   return result;

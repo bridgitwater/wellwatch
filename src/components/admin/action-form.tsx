@@ -26,7 +26,8 @@ export function ActionForm({
   action: Action;
   children: React.ReactNode;
   className?: string;
-  confirm?: string;
+  /** Asked before submitting. A function gets the form's data and can return null to skip asking. */
+  confirm?: string | ((fd: FormData) => string | null);
   quiet?: boolean;
   resetOnSuccess?: boolean;
   noticeClassName?: string;
@@ -54,8 +55,9 @@ export function ActionForm({
       onSubmit={(e) => {
         e.preventDefault();
         if (pending) return;
-        if (confirm && !window.confirm(confirm)) return;
         const fd = new FormData(e.currentTarget, (e.nativeEvent as SubmitEvent).submitter);
+        const question = typeof confirm === "function" ? confirm(fd) : confirm;
+        if (question && !window.confirm(question)) return;
         startTransition(() => formAction(fd));
       }}
     >

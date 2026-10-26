@@ -87,6 +87,16 @@ Scale: medium — 50 to 500 funders and wells. Budget: free tiers wherever possi
 
 ## 6. Status
 
+### 27 Oct 2026 (stress test + hardening)
+Stress-tested the 26 Oct batch against a full local stack (Supabase Postgres, GoTrue, PostgREST from ghcr.io; mailpit; a fake Resend; production limits) and fixed what broke:
+- **Sign-in emails are now sent by WellWatch through Resend**, not Supabase Auth. Supabase's 30/hour project allowance could be used up by anyone (locking every funder out, and making on-file emails answer differently, which revealed who is on file); its links also signed in on a plain GET. `login/actions.ts` now looks up the profile, asks `signin_allow()` (1 link/min and 3/hour per person, 30 requests/hour per IP from Vercel's `x-real-ip`, 60 sign-in emails/day in total so Resend's daily allowance stays free for update emails), and sends the link from `after()`. Every request answers "a link is on its way", in the same time. Links go to the button-press `/auth/confirm`. The Supabase "Magic link" template is no longer used for new links; `/auth/complete` stays for links already in inboxes.
+- **Welcome emails** claim `welcomed_at` before sending (and restore it if sending fails): no double welcomes from two admins, never "sent but not recorded".
+- **Account creation** is race-safe (`createAccount`/`profileIdFor` in `src/lib/admin/funders.ts`); roles are set explicitly, never from sign-up metadata.
+- **Removing admins** goes through `demote_admin()`, which never leaves zero admins. **Adding an admin** asks first and warns for non-bridgitwater.org addresses.
+- **Notifier** takes a `job_locks` lock (`job_try_lock`/`job_unlock`), so overlapping runs can't double-email.
+- Emails are normalised the same way everywhere (`src/lib/email-address.ts`), including CSV import. `/auth/confirm` shows "try again" on a network drop instead of "expired".
+- Migration `20261027000000_hardening.sql` must be applied **before** this code (sign-in calls `signin_allow`).
+
 ### 26 Oct 2026 (admin experience batch)
 - **Team page** (Admin → Team): add an admin by email (creates a confirmed account or promotes an existing funder, then emails a welcome with a sign-in link), send a fresh sign-in link, remove admin access (not yourself). Replaces adding staff in the Supabase dashboard + SQL. `src/lib/admin/team-actions.ts`.
 - **Funder welcome step**: `well_funders.welcomed_at`. Linking a funder sends nothing; the notifier skips funders until an admin presses "Send welcome email" on the well page (or ticks it when linking). Welcome and team emails link to **/auth/confirm**, which signs in only when the person presses a button, so corporate mail scanners can't use up the one-time token. Every new link replaces the person's previous one. Links last the project's email OTP lifetime (1 hour; consider raising to 24 h in Supabase → Auth → Email).

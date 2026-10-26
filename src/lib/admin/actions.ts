@@ -9,6 +9,7 @@ import { createWellFolder } from "../drive/client";
 import { STAGE_ORDER, type WellStage } from "../stages";
 import { requireAdmin } from "./guard";
 import { ensureFunderProfile } from "./funders";
+import { emailSchema } from "../email-address";
 import { sendFunderWelcome } from "../email/welcome";
 import { countryTimeZone, exifLocalToIso, tzOffsetMinutes } from "../timezones";
 
@@ -154,7 +155,7 @@ export async function setStage(_prev: ActionResult | null, fd: FormData): Promis
 const funderSchema = z.object({
   well_id: str(40),
   code: str(20),
-  email: z.string().trim().toLowerCase().email("Enter a valid email"),
+  email: emailSchema,
   display_name: optStr(120),
   amount: optNum,
   currency: str(3).default("AUD").transform((s) => s.toUpperCase()),
