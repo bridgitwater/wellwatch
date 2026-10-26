@@ -87,12 +87,17 @@ Scale: medium — 50 to 500 funders and wells. Budget: free tiers wherever possi
 
 ## 6. Status
 
+### 26 Oct 2026 (Carla couldn't sign in)
+- Carla's admin login is **carla@bridgitwater.org** (not info@). Dusty added her on 21 Oct with Supabase's "Invite user"; she opened the invite after it expired, so her email stayed unconfirmed. Supabase treats an unconfirmed user's sign-in as a new signup, signups are disabled, and `login/actions.ts` hid that `signup_disabled` error behind "a sign-in link is on its way" — so nothing ever arrived.
+- Fixed (ad81821): on `signup_disabled`, if the email has a profile, the action confirms it with the service role and resends the link. Expired links that land on /login with `#error=` now show the "link expired" notice. Verified live: carla@ confirmed 26 Oct 07:35 UTC, role admin, link issued.
+- Prefer adding staff/funders through WellWatch (or Supabase "Add user" with auto-confirm) over Supabase "Invite user"; if an invite is used, the person can now simply request a link on the sign-in page.
+
 ### 19 Oct 2026 (health check + Wave 1)
 Full health check and fix plan: Claude Docs "WellWatch health check and fix plan"; partner/Carla guide: "WellWatch onboarding guide". Sync and notify crons verified (1,008/1,008 and 168/168 runs OK over 7 days); magic link delivers to inbox in under a minute.
 - Fixed: admin Partners page was empty since migration 000300 (`wells(count)` refused for authenticated) — now `wells(id)`; piped-scheme stage names; functions pinned to `syd1` via `vercel.json`.
 - Data: partners SPREAWS, SRHED, KEEP added. Pilot wells loaded (no funders invited yet): IN-2026-001 Vaddipalli (SRHED), IN-2026-002 Koonavaripalli (SPREAWS), UG-2026-001 Wabwoko HCIII (Suubi, in progress), NP-2026-001 Takare (KEEP). Codes are CC-YYYY-NNN in load order. Ngoleka example anonymised ("an Australian family").
 - Email: wells@bridgitwater.org does not exist (bounces). wellwatch@ accepts mail but nobody receives it — route it to info@ in Google Admin.
-- Carla's admin login will be info@bridgitwater.org (Dusty to create + promote).
+- Carla's admin login: see 26 Oct (carla@, not info@).
 - Open (Wave 2): welcome/invite email, same-day updates marked notified without sending, hidden media still reachable via link-shared folders, unsubscribe link, admin action errors, WhatsApp filename dates.
 
 ### 6 Sep 2026
